@@ -4,10 +4,10 @@ from text import cleaned_text_to_sequence
 from text.cleaner import clean_text
 from module.mel_processing import spectrogram_torch
 from my_utils import load_audio
-from tools.i18n.i18n import I18nAuto
+# from tools.i18n.i18n import I18nAuto
 
 # 多语言
-i18n = I18nAuto()
+# i18n = I18nAuto()
 
 punctuation = set(["!", "?", "…", ",", ".", "-", " "])
 
@@ -36,14 +36,14 @@ language_punctuation = {
     },
 }
 
-dict_language = {
-    i18n("中文"): "all_zh",  # 全部按中文识别
-    i18n("英文"): "en",  # 全部按英文识别#######不变
-    i18n("日文"): "all_ja",  # 全部按日文识别
-    i18n("中英混合"): "zh",  # 按中英混合识别####不变
-    i18n("日英混合"): "ja",  # 按日英混合识别####不变
-    i18n("多语种混合"): "auto",  # 多语种启动切分识别语种
-}
+# dict_language = {
+#     i18n("中文"): "all_zh",  # 全部按中文识别
+#     i18n("英文"): "en",  # 全部按英文识别#######不变
+#     i18n("日文"): "all_ja",  # 全部按日文识别
+#     i18n("中英混合"): "zh",  # 按中英混合识别####不变
+#     i18n("日英混合"): "ja",  # 按日英混合识别####不变
+#     i18n("多语种混合"): "auto",  # 多语种启动切分识别语种
+# }
 
 splits = {
     "，",
@@ -514,8 +514,9 @@ if __name__ == "__main__":
     “……尊敬的收藏家大人！”
 """
     # print(format_text(text))
-    lan = "en"
+    lan = "zh"
     text = format_text(text, lan)
+    print(text)
 
     if "zh" in lan:
         text = cut3(text)
