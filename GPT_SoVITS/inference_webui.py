@@ -19,6 +19,10 @@ logging.getLogger("charset_normalizer").setLevel(logging.ERROR)
 logging.getLogger("torchaudio._extension").setLevel(logging.ERROR)
 import pdb
 import torch
+from inference_help import get_project_path
+
+
+project_path = get_project_path()
 
 if os.path.exists("./gweight.txt"):
     with open("./gweight.txt", "r", encoding="utf-8") as file:
@@ -27,7 +31,7 @@ if os.path.exists("./gweight.txt"):
 else:
     gpt_path = os.environ.get(
         "gpt_path",
-        "GPT_SoVITS/pretrained_models/s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt",
+        f"{project_path}/GPT_SoVITS/pretrained_models/s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt",
     )
 
 if os.path.exists("./sweight.txt"):
@@ -36,17 +40,19 @@ if os.path.exists("./sweight.txt"):
         sovits_path = os.environ.get("sovits_path", sweight_data)
 else:
     sovits_path = os.environ.get(
-        "sovits_path", "GPT_SoVITS/pretrained_models/s2G488k.pth"
+        "sovits_path", f"{project_path}/GPT_SoVITS/pretrained_models/s2G488k.pth"
     )
 # gpt_path = os.environ.get(
 #     "gpt_path", "pretrained_models/s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt"
 # )
 # sovits_path = os.environ.get("sovits_path", "pretrained_models/s2G488k.pth")
 cnhubert_base_path = os.environ.get(
-    "cnhubert_base_path", "GPT_SoVITS/pretrained_models/chinese-hubert-base"
+    "cnhubert_base_path",
+    f"{project_path}/GPT_SoVITS/pretrained_models/chinese-hubert-base",
 )
 bert_path = os.environ.get(
-    "bert_path", "GPT_SoVITS/pretrained_models/chinese-roberta-wwm-ext-large"
+    "bert_path",
+    f"{project_path}/GPT_SoVITS/pretrained_models/chinese-roberta-wwm-ext-large",
 )
 infer_ttswebui = os.environ.get("infer_ttswebui", 9872)
 infer_ttswebui = int(infer_ttswebui)
@@ -72,6 +78,7 @@ from time import time as ttime
 from module.mel_processing import spectrogram_torch
 from my_utils import load_audio
 from tools.i18n.i18n import I18nAuto
+
 
 i18n = I18nAuto()
 
@@ -599,10 +606,8 @@ def change_choices():
     }, {"choices": sorted(GPT_names, key=custom_sort_key), "__type__": "update"}
 
 
-pretrained_sovits_name = "GPT_SoVITS/pretrained_models/s2G488k.pth"
-pretrained_gpt_name = (
-    "GPT_SoVITS/pretrained_models/s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt"
-)
+pretrained_sovits_name = f"{project_path}/GPT_SoVITS/pretrained_models/s2G488k.pth"
+pretrained_gpt_name = f"{project_path}/GPT_SoVITS/pretrained_models/s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt"
 SoVITS_weight_root = "SoVITS_weights"
 GPT_weight_root = "GPT_weights"
 os.makedirs(SoVITS_weight_root, exist_ok=True)
@@ -774,7 +779,7 @@ with gr.Blocks(title="GPT-SoVITS WebUI") as app:
             button5.click(cut5, [text_inp], [text_opt])
         gr.Markdown(value=i18n("后续将支持转音素、手工修改音素、语音合成分步执行。"))
 
-app.queue(concurrency_count=511, max_size=1022).launch(
+app.launch(
     server_name="0.0.0.0",
     inbrowser=True,
     share=is_share,

@@ -1,49 +1,52 @@
-﻿import re
+﻿import os
+import re
 import torch
 from text import cleaned_text_to_sequence
 from text.cleaner import clean_text
 from module.mel_processing import spectrogram_torch
 from my_utils import load_audio
-# from tools.i18n.i18n import I18nAuto
+from tools.i18n.i18n import I18nAuto
+import json
+import inspect
+from pypinyin import pinyin, Style
+from difflib import SequenceMatcher
 
 # 多语言
-# i18n = I18nAuto()
+i18n = I18nAuto()
 
 punctuation = set(["!", "?", "…", ",", ".", "-", " "])
 
 
 # 定义语言对应的符号
 language_punctuation = {
-    "en": {
-        "comma": ",",
-        "period": ".",
-        "newline": ".",
-        "question_mark": "?",
-        "exclamation_mark": "!",
-        "ellipsis": "...",
-        "tilde": "~",
-        "colon": ":",
-    },
     "zh": {
         "comma": "，",
         "period": "。",
-        "newline": "。",
         "question_mark": "？",
         "exclamation_mark": "！",
         "ellipsis": "…",
-        "tilde": "～",
         "colon": "：",
+        "newline": "。",
+    },
+    "en": {
+        "comma": ",",
+        "period": ".",
+        "question_mark": "?",
+        "exclamation_mark": "!",
+        "ellipsis": "...",
+        "colon": ":",
+        "newline": ".",
     },
 }
 
-# dict_language = {
-#     i18n("中文"): "all_zh",  # 全部按中文识别
-#     i18n("英文"): "en",  # 全部按英文识别#######不变
-#     i18n("日文"): "all_ja",  # 全部按日文识别
-#     i18n("中英混合"): "zh",  # 按中英混合识别####不变
-#     i18n("日英混合"): "ja",  # 按日英混合识别####不变
-#     i18n("多语种混合"): "auto",  # 多语种启动切分识别语种
-# }
+dict_language = {
+    i18n("中文"): "all_zh",  # 全部按中文识别
+    i18n("英文"): "en",  # 全部按英文识别#######不变
+    i18n("日文"): "all_ja",  # 全部按日文识别
+    i18n("中英混合"): "zh",  # 按中英混合识别####不变
+    i18n("日英混合"): "ja",  # 按日英混合识别####不变
+    i18n("多语种混合"): "auto",  # 多语种启动切分识别语种
+}
 
 splits = {
     "，",
@@ -107,7 +110,6 @@ def get_spepc(hps, filename):
     return spec
 
 
-# 格式化文本
 def format_text(text, language="zh"):
     text = text.strip("\n")
     # 根据语言获取对应的符号
@@ -119,7 +121,8 @@ def format_text(text, language="zh"):
     text = re.sub(r" {2,}", punct["period"], text)  # 多个空格替换为句号
     text = re.sub(r"\n|\r", punct["newline"], text)  # 回车，换行符替换为句号
     text = re.sub(r" ", punct["comma"], text)  # 一个空格替换为逗号
-    text = re.sub(r"[\"\'‘’“”]", "", text)
+    text = re.sub(r"[\"\'‘’“”\[\]【】〖〗]", "", text)  # 删除特殊符号
+    text = re.sub(r"[:：……—]", punct["period"], text)  # 替换为句号
 
     # 替换所有非当前语言的符号为对应语言的符号
     if language == "en":
@@ -136,9 +139,7 @@ def format_text(text, language="zh"):
                 if match.group(0) == "！"
                 else punct["ellipsis"]
                 if match.group(0) == "…"
-                else punct["tilde"]
-                if match.group(0) == "～"
-                else punct["colon"]
+                else punct["period"]
             ),
             text,
         )
@@ -156,9 +157,7 @@ def format_text(text, language="zh"):
                 if match.group(0) == "!"
                 else punct["ellipsis"]
                 if match.group(0) == "..."
-                else punct["tilde"]
-                if match.group(0) == "~"
-                else punct["colon"]
+                else punct["period"]
             ),
             text,
         )
@@ -385,145 +384,202 @@ def process_text(texts):
     return [text for text in texts if text not in [None, " ", "", "\n"]]
 
 
-if __name__ == "__main__":
-    text = """
-第一章 上班第一天就准备辞职
-    辞职报告
-    尊敬的局领导:
-    今天是正式入职第一天，我很高兴自己在这个时候向局里正式提出辞职。
-    进入单位进行初任培训也已经半年了，在这半年里，也没得到局里什么帮助，每天上班像上坟，一到周一就心里发堵。
-    在这里我收获了繁琐的审批流程，收获了无所不在的官僚主义，就是没收获多少薪水。
-    实在不想在这份自己并不适合的工作中浪费生命，也想换一下环境，看看诗和远方。
-    爱谁谁吧。
-    当然，并不是因为单位的工资低，也不是因为工作环境危险，更不是因为正式入职就把我调到了后勤支援部门。
-    离开异常局，很舍不得，舍不得领导们的官僚主义裙带关系，舍不得同事之间的拍马溜须。
-    我很高兴不能为领导们辉煌的明天贡献自己的力量了。
-    另外建议以后给年轻人画大饼的时候，不要用“领导都看在眼里”这种话术。
-    时间长了容易给大家领导得了白内障的错觉。
-    此致
-    敬礼!
-    辞职人：李凡
-    将笔放下，李凡轻轻弹了弹刚写完的辞职信，露出如释重负的笑容。
-    顺手把“培训定级E，精神力等级E，定岗支援中心解剖处见习调查员”的通知给丢在垃圾桶里。
-    重生到这个世界已经一个多月了。
-    他一个前世的古董商，穿越成了什么异常局西南分局的见习调查员。
-    还没有继承对方的记忆，直接就进入了培训。
-    封闭式培训了一个多月，整个人都是懵的，最后直接定了个最低等级，分了个最差的部门。
-    如果不是封闭式培训的时候不让出来，也为了摸清他这个前身到底是什么状况，他早就已经辞职了。
-    今天是结束培训正式入职工作的第一天，也是他彻底辞职的一天。
-    实在是不适合这种每天心惊胆战，朝九晚五做噩梦的生活。
-    有编制也不要了。
-    将辞职报告放进信封里折好，李凡走出公寓宿舍，迈着轻松的步伐向办公楼走去。
-    全局新人入职欢迎大会即将在礼堂召开，远远已经能看到会议召开的电子横幅。
-    院子里还有一些警示性标语，诸如：
-    “一旦心空，立刻报告！警惕清洁协会！”
-    “内心一尘不染的往往不是人类！”
-    “内心越平静，越远离人类！”
-    来到办公楼，把辞职报告塞进局长信箱，李凡感觉心里的大石头彻底落下。
-    接下来这里的一切都和他无关了，以后他就彻底自由自在了。
-    随后转身去单位餐厅吃早餐。
-    进了餐厅，里面已经是熙熙攘攘的人。
-    虽然前些天大家还在一起培训，但今天分了部门和岗位之后，餐厅里吃饭的人已经分成了泾渭分明的几拨。
-    靠近窗户，最敞亮舒服的地方，是那些进入一线调查部，最有希望成为觉醒者的人。
-    这些人身穿挺拔的制服，声音洪亮，目光明亮，相互交谈着，不时发出哄堂大笑，人虽然不多，声音却遮盖了整个餐厅。
-    有几个原本和李凡熟识的，在看到李凡的时候只是目光一瞥，仿佛根本不认识一样。
-    阶层就这么拉开了。
-    然后是中间区域，这里坐着的都是一脸官僚气息的政工部门成员，虽然精神力达不到觉醒者的标准，却是实权部门。
-    最后则是靠近边缘角落的区域。
-    这里都是被分到支援中心的人，可能这辈子都是见习调查员了，职级低工资低待遇低，三低人员。
-    这些支援中心的见习调查员们也都在低调的吃饭，没什么声音。
-    一群败犬。
-    “凡哥，这里，这里！”一个声音传来。
-    刚打了一份油条豆浆的李凡循声看去，就见赵雷正一脸兴高采烈地在支援中心的就餐区朝他招手。
-    李凡端着餐盘过去坐下，赵雷已经迫不及待地开始八卦：
-    “凡哥，分到哪个部门了？我分到支援中心装备处了，据说张雅晴分到调查部三大队二组了，哎，没想到她那么厉害，不知道她来领装备的时候还能不能再见面。”
-    李凡吃一块腐乳说道：“我分到解剖处了。”
-    赵雷一口豆浆差点喷出来，呛得猛咳一通。
-    旁边的几个同事也都稍稍把盘子往后撤了撤，下意识离李凡远了点。
-    解剖处，那可不是个好地方，基本上是异常局里最烂的部门了。
-    每天就是和那些怪异的尸体打交道，升职无望，加薪很难，工作据说又极为繁忙。
-    而且据说和那些尸体待久了人都容易变态，都疯疯癫癫的。
-    解剖处减员很少，一般都是自杀，每年收不了几个人，所以也很少听谁过去。
-    旁边几个原本还觉得同病相怜的同事看向李凡的目光中，都带上了一点优越感。
-    败犬中的败犬。
-    “凡哥，你这到底是考了多少分？不过解剖处也没啥，起码……起码安稳。”赵雷一时有些不知道怎么安慰。
-    周围几人也都纷纷出言安慰，什么起点不是终点、好好干领导都看在眼里之类的话说了一堆。
-    李凡倒也不在意，毕竟他的辞职报告都递交了。
-    墙上的电视里，新一期的“异常简报”已经开始播放。
-    “枫叶谷市发生群体性异常感染事件，异常局东北分局迅速处置……”
-    “幻灵党袭击墨西哥军警车队，造成131人阵亡……”
-    “北美镇魂局发现近百座印第安亡灵教堂墓地，正在艰难镇压……”
-    “一个月前，清洁协会十二骑士之一的‘收藏家’突袭东南亚降临会曼谷总会，当场毙杀三十五名降灵师，包括七名异常附体的大降灵师，头颅全无……”
-    李凡吹了个口哨。
-    清洁协会不愧是最大的觉醒者犯罪组织，实在是太邪性了，不，应该说“收藏家”太邪性了。
-    三十五名降灵师，就是三十五名觉醒者，渣都不剩，什么概念！
-    不愧是凶名赫赫，在觉醒者通缉榜单里排名前几的人物，据说被他暗杀过的南美和非洲国家总统就有七个。
-    好在自己辞职之后，安安稳稳做个古董商，这辈子都不可能遇到收藏家了。
-    对面一个同属装备处的男子小声说道：
-    “我听说这个收藏家做事还挺有原则的，从来不对平民出手，目标全都是觉醒者或者各国政要……你们说咱们局长和收藏家谁厉害？”
-    他说的局长，就是异常局西南分局的局长赵逸峰。
-    赵雷同样低声道：
-    “那还用说，赵逸峰局长可是顶级觉醒者，评级据说达到了A！我估计收藏家要杀他，起码得三个回合吧？”
-    旁边一个模样俊俏的少女捂嘴笑道：
-    “你也太损了，咱们局长就不能投降了？我听说收藏家超级帅气，但是谁也没见过他的真面目……”
-    赵雷道：“悖论悖论，既然没人见过，那怎么知道他帅气的？哎，这清洁协会实力扩张的有点太厉害了……你说是吧凡哥？”
-    李凡摇头道：“收藏家有些强过头了，功高震主，对清洁协会来说不是什么好事情。”
-    此时电视上现出“觉醒者通缉榜”几个字样，随后是排名前十的觉醒者罪犯，第一名的赫然就是只有剪影的收藏家！
-    “卧槽，收藏家的排名又上升了！都飙到第一了！”
-    “好像连降临会都对他发出了通缉，黑白两道都出动了。”
-    “清洁协会这么有面子吗？十二骑士里面随便一个都这么强……”
-    一片惊呼中，李凡吃完早餐，和赵雷打个招呼，回到了宿舍，开始收拾行李。
-    新人入职欢迎会还有十几分钟就要召开了，不过他也懒得参加。
-    反正已经辞职了，再和人虚与委蛇的寒暄也没意思。
-    收拾了一会儿，电话突然响起，是门口传达室打来的。
-    “李凡，你的父母来看望你了，按规定必须由内部人员自己接人进去。”
-    李凡不由一愣，目光都变得柔和，看向摆在桌子上的一个相框。
-    相框里是一家三口的合影，和前世不同，这一世他是有自己的父母家人的。
-    虽然没有继承记忆，但光是看合影中那个略显严肃的父亲和那个眉目慈祥的母亲，就能知道这是个温馨的家庭。
-    之前只通过电话，他还没有真正见过自己的父母，辞职的事情也没有沟通，希望他们能理解吧。
-    收拾好心情，李凡在传达室接到了自己的父母。
-    “小凡，最近是不是又没好好吃饭？怎么瘦了？”穿着碎花长裙的母亲心疼的说道，“快带我和你爸去宿舍看看，给你带了一堆好吃的。”
-    “这小子看起来倒是有劲儿了，看样子培训期间表现不错。”父亲微笑着拍了拍李凡的肩膀满意道，“长大了……”
-    李凡心中一暖，这一世，他不再是孤家寡人了。
-    “爸，妈，咱们去宿舍。”李凡接过沉重的行礼包裹笑着说道。
-    两人人手一个拉杆箱，还有个大背包，带了不少东西。
-    甚至隐隐能闻到腊肉腊肠的味道。
-    迈着轻快的步伐带着父母走过异常局的大院，李凡心中安定了许多。
-    有家人的感觉，真的很好。
-    哪怕是为了家人，他也应该辞职，离开异常局，过上安稳的普通人的生活。
-    就是不知道二老会不会在意编制的问题。
-    李凡决定到了宿舍好好跟父母解释解释自己的决定，希望他们能理解。
-    “今天局里开入职迎新大会，大家都在大礼堂呢。”李凡笑着说。
-    父母相视一眼，依然是笑吟吟的没有说什么。
-    只是偶尔感叹大院里连个警卫都没有。
-    很快到了宿舍，李凡打开门放下行礼，正准备给父母倒水，却没想到原本笑吟吟的父母表情瞬间严肃。
-    难道他们发现自己要辞职的事情了？
-    两人将门关好，毕恭毕敬地站在李凡面前。
-    看他们的神情，竟然对李凡十分畏惧，眼神之中则带着狂热。
-    正在李凡疑惑的时候，两人突然齐齐将双手举过头顶，向李凡行礼，同时低声吟唱道：
-    “人类的灵魂终将净化，污浊的尘世终将清洁，深渊之主终将降临！”
-    紧接着父亲向李凡低头沉声说道：
-    “报告组长，杜鹃计划第一阶段已经布置完毕，异常局西南分局323处精神炸弹全部设置完毕，一旦启动，将在短时间内毁掉异常局西南分局百分之六十的行动力，同时释放本地收容的异常物品造成大面积感染。杜鹃小队的潜伏者已经全部待命，随时可以发动总攻。”
-    母亲接着上前一步，恭敬地垂手说道：
-    “请问是否要立刻启动第一阶段计划？只需要一次爆炸，所有的调查员都将得到净化，这实在是一个完美无缺的计划，请接受属下的赞美，愿尘世清洁，愿深渊之主降临。”
-    “另外，您的武器装备也已经准备好了……”
-    一个大行李箱被打开，露出里面挂成几排的人头，每一个头颅都做了防腐处理，风干缩水后只有巴掌大小。
-    其中一些还有绚丽的纹面，赫然是今天电视上看到的那些降临会降灵师！
-    父亲和母亲的脸上带着讨好和兴奋的笑容，齐声说道：
-    “……用生命捍卫您的命令……”
-    “……尊敬的收藏家大人！”
-"""
-    # print(format_text(text))
-    lan = "zh"
-    text = format_text(text, lan)
-    print(text)
+def get_project_path():
+    """
+    获取项目路径。
 
-    if "zh" in lan:
-        text = cut3(text)
+    Returns:
+        str: 项目路径。
+    """
+    # 获取当前脚本所在的路径
+    current_path = os.path.dirname(
+        os.path.abspath(inspect.getfile(inspect.currentframe()))
+    )
+    # 获取当前项目根路径（去除最后一级目录）
+    project_path = os.path.dirname(current_path)
+    return project_path
+
+
+def load_model_config():
+    """
+    加载模型配置文件，并返回包含模型路径和文件信息的字典。
+
+    Returns:
+        dict: 包含模型路径和文件信息的字典。
+    """
+    project_path = get_project_path()
+    config_path = os.path.join(project_path, "GPT_SoVITS", "model_config.json")
+
+    # 读取并解析 model_config.json 文件
+    with open(config_path, "r", encoding="utf-8") as file:
+        model_config = json.load(file)
+
+    models = {}
+    for model_name in model_config:
+        models[model_name] = {}
+
+        # 设置模型路径
+        absolute_model_path = os.path.join(
+            project_path, "model", model_config[model_name]["model_path"]
+        )
+        models[model_name]["model_path"] = absolute_model_path
+
+        # 查找 GPT_weights 模型路径
+        gpt_path = next(
+            (
+                os.path.join(root, file)
+                for root, dirs, files in os.walk(absolute_model_path)
+                for file in files
+                if file.endswith(".ckpt")
+            ),
+            None,
+        )
+        if gpt_path:
+            models[model_name]["gpt_path"] = gpt_path
+
+        # 查找 SoVITS_weights 模型路径
+        sovits_path = next(
+            (
+                os.path.join(root, file)
+                for root, dirs, files in os.walk(absolute_model_path)
+                for file in files
+                if file.endswith(".pth")
+            ),
+            None,
+        )
+        if sovits_path:
+            models[model_name]["sovits_path"] = sovits_path
+
+        # 查找参考音频路径
+        prompt_wav_path = next(
+            (
+                os.path.join(root, file)
+                for root, dirs, files in os.walk(absolute_model_path)
+                for file in files
+                if file.endswith(".wav")
+            ),
+            None,
+        )
+        if prompt_wav_path:
+            models[model_name]["prompt_wav_path"] = prompt_wav_path
+
+        # 查找参考文本路径
+        prompt_text = next(
+            (
+                file.replace(".wav", "")
+                for root, dirs, files in os.walk(absolute_model_path)
+                for file in files
+                if file.endswith(".wav")
+            ),
+            None,
+        )
+        if prompt_text:
+            models[model_name]["prompt_text"] = prompt_text
+
+        models[model_name]["prompt_language"] = model_config[model_name][
+            "prompt_language"
+        ]
+
+    return models
+
+
+def has_omission(gen_text, text):
+    """
+    检查生成的文本是否有遗漏原文的内容，通过拼音比较和相似度判断。
+    :param gen_text: 生成的文本
+    :param text: 原始文本
+    :return: 若生成的文本拼音相似度超过98%且没有增加重复字，则返回 False（没有遗漏），否则返回 True（有遗漏）
+    """
+
+    def remove_punctuation(text):
+        """
+        移除文本中的标点符号。
+        """
+        return re.sub(r"[^\w\s]", "", text)
+
+    def get_pinyin(text):
+        """
+        获取文本的拼音表示。
+        """
+        return " ".join(["".join(p) for p in pinyin(text, style=Style.NORMAL)])
+
+    def get_pinyin_duo(text):
+        """
+        获取文本的拼音表示，支持多音字。
+        """
+        return pinyin(text, style=Style.NORMAL, heteronym=True)
+
+    def calculate_similarity(pinyin1, pinyin2):
+        """
+        计算两个拼音字符串的相似度。
+        """
+        return SequenceMatcher(None, pinyin1, pinyin2).ratio()
+
+    # 去除标点符号
+    gen_text_clean = remove_punctuation(gen_text)
+    text_clean = remove_punctuation(text)
+
+    # 获取拼音
+    gen_text_pinyin = get_pinyin(gen_text_clean)
+    text_pinyin = get_pinyin(text_clean)
+
+    gen_text_ping_duo = get_pinyin_duo(gen_text_clean)
+    text_ping_duo = get_pinyin_duo(text_clean)
+
+    # 计算拼音相似度
+    sim_ratio = calculate_similarity(gen_text_pinyin, text_pinyin) * 100
+
+    res = True
+    # 判断是否有遗漏
+    if len(gen_text_clean) != len(text_clean):
+        # 如果字数不等，根据拼音相似度判断，每个字的差异减少5%的相似度
+        length_difference = abs(len(gen_text_clean) - len(text_clean))
+        adjusted_sim_ratio = sim_ratio - length_difference * 5
+        res = True
+        sim_ratio = adjusted_sim_ratio
     else:
-        text = cut4(text)
-    texts = text.split("\n")
-    texts = process_text(texts)
-    texts = merge_short_text_in_array(texts, 5)
-    for i in range(len(texts)):
-        print(f"{i+1}/{len(texts)}: {texts[i]}")
+        # 对比 gen_text_ping_duo 与 text_ping_duo
+        # 判断每个字符是否存在多音字，若存在，则对比两个字符多音字是否有相同，若有则满足字符相等，若不存在则减 5
+        sim_ratio = 100
+        for gen_word, text_word in zip(gen_text_ping_duo, text_ping_duo):
+            if not any(gen in text_word for gen in gen_word):
+                sim_ratio -= 5
+        res = sim_ratio < 98
+
+    print(f"""
+=========
+生成文本：{gen_text_clean}
+生成文本长度：{len(gen_text_clean)}
+输入文本：{text_clean}
+输入文本长度：{len(text_clean)}
+相似度：{sim_ratio}
+=========
+""")
+    return res, sim_ratio
+
+
+# 测试例子
+if __name__ == "__main__":
+    gen_text = "而在长缩不定的雾气中他仿佛已经听到海浪声传浪声传入耳边"
+    org_text = "而在涨缩不定的雾气中他仿佛已经听到海浪声传入耳边"
+    print(has_omission(gen_text, org_text))  # true
+
+    gen_text = "外观古典精美地黑色燧发手枪是的就连自身都要打个问号"
+    org_text = "外观古典精美的黑色燧发手枪是的就连自身都要打个问号"
+    print(has_omission(gen_text, org_text))  # false 100% 多音字匹配
+
+    gen_text = "而是消耗消耗最后一片残存的幻影正如雾般从空气中消散干净"
+    org_text = "而失乡号最后一片残存的幻影正如雾般从空气中消散干净"
+    print(has_omission(gen_text, org_text))  # true
+
+    gen_text = "那位虔诚的牧师正趴在齐刀台旁喘着粗气"
+    org_text = "那位虔诚的牧师正趴在祈祷台旁大口喘着粗气"
+    print(has_omission(gen_text, org_text))  # true
+
+    gen_text = "那位虔诚地牧师正趴在起到台旁大口喘着粗气"
+    org_text = "那位虔诚的牧师正趴在祈祷台旁大口喘着粗气"
+    print(has_omission(gen_text, org_text))  # false 100% 多音字匹配
+
+    gen_text = "略显凌乱的单身公寓内周铭伏案桌前"
+    org_text = "却显凌乱的单身公寓内周明福案桌前"
+    print(has_omission(gen_text, org_text))  # true

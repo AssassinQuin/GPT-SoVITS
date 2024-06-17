@@ -1,10 +1,18 @@
+import inspect
 import json
 import locale
 import os
 
+# 获取当前脚本所在的路径
+current_path = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+# 获取当前项目根路径（去除最后一级目录）
+project_path = os.path.dirname(current_path)
+
 
 def load_language_list(language):
-    with open(f"./i18n/locale/{language}.json", "r", encoding="utf-8") as f:
+    with open(
+        f"{project_path}/i18n/locale/{language}.json", "r", encoding="utf-8"
+    ) as f:
         language_list = json.load(f)
     return language_list
 
