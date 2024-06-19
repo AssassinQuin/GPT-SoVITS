@@ -1,1 +1,1 @@
-/root/code/GPT-SoVITS/model/旁白/aside-e20.ckpt
+/root/code/GPT-SoVITS/model/旁白_7h/7h-e50.ckpt

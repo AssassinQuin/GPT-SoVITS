@@ -33,13 +33,13 @@ from time import time as ttime
 import shutil
 
 
-def my_save(fea,path):#####fix issue: torch.save doesn't support chinese path
-    dir=os.path.dirname(path)
-    name=os.path.basename(path)
+def my_save(fea, path):  #####fix issue: torch.save doesn't support chinese path
+    dir = os.path.dirname(path)
+    name = os.path.basename(path)
     # tmp_path="%s/%s%s.pth"%(dir,ttime(),i_part)
-    tmp_path="%s%s.pth"%(ttime(),i_part)
-    torch.save(fea,tmp_path)
-    shutil.move(tmp_path,"%s/%s"%(dir,name))
+    tmp_path = "%s%s.pth" % (ttime(), i_part)
+    torch.save(fea, tmp_path)
+    shutil.move(tmp_path, "%s/%s" % (dir, name))
 
 
 txt_path = "%s/2-name2text-%s.txt" % (opt_dir, i_part)
@@ -122,7 +122,9 @@ if os.path.exists(txt_path) == False:
                     [wav_name, text, language_v1_to_language_v2.get(language, language)]
                 )
             else:
-                print(f"\033[33m[Waring] The {language = } of {wav_name} is not supported for training.\033[0m")
+                print(
+                    f"\033[33m[Waring] The {language = } of {wav_name} is not supported for training.\033[0m"
+                )
         except:
             print(line, traceback.format_exc())
 

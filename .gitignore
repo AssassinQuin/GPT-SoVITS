@@ -13,3 +13,6 @@ TEMP
 tmp
 model
 *.log
+audio
+*.wav
+*.mp3

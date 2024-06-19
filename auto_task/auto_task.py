@@ -30,6 +30,7 @@ def gen_wav(file_path, text, language):
 
 
 def main(novel_name, start_chapter, end_chapter):
+    # text = "在他身后的图腾柱上那熊熊燃烧的火球中突然发出了一连串令人不安的噼啪爆鸣"
     base_dir = os.path.join(os.getcwd(), "tmp", novel_name)
     data_dir = os.path.join(base_dir, "data")
     gen_dir = os.path.join(base_dir, "gen")
@@ -45,18 +46,24 @@ def main(novel_name, start_chapter, end_chapter):
             print(f"章节文件 {chapter_file} 不存在")
 
 
+def test():
+    main("shyj", 21, 21)
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Generate WAV files from text chapters."
-    )
-    parser.add_argument(
-        "--novel_name", type=str, default="shyj", help="The name of the novel."
-    )
-    parser.add_argument(
-        "--start", type=int, default=1, help="The starting chapter number."
-    )
-    parser.add_argument("--end", type=int, default=2, help="The ending chapter number.")
+    # parser = argparse.ArgumentParser(
+    #     description="Generate WAV files from text chapters."
+    # )
+    # parser.add_argument(
+    #     "--novel_name", type=str, default="shyj", help="The name of the novel."
+    # )
+    # parser.add_argument(
+    #     "--start", type=int, default=1, help="The starting chapter number."
+    # )
+    # parser.add_argument("--end", type=int, default=2, help="The ending chapter number.")
 
-    args = parser.parse_args()
+    # args = parser.parse_args()
 
-    main(args.novel_name, args.start, args.end)
+    # main(args.novel_name, args.start, args.end)
+
+    test()

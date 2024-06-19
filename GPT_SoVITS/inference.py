@@ -1,6 +1,4 @@
 ﻿import os
-import logging
-from venv import logger
 import torch
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 import numpy as np
@@ -9,7 +7,6 @@ from feature_extractor import cnhubert
 from module.models import SynthesizerTrn
 from AR.models.t2s_lightning_module import Text2SemanticLightningModule
 from time import time as ttime
-from tools.i18n.i18n import I18nAuto
 import LangSegment
 import soundfile as sf
 from tools.asr.funasr_asr import only_asr
@@ -20,31 +17,14 @@ from inference_help import (
     format_text,
     splits,
     get_first,
-    cut1,
-    cut2,
-    cut3,
-    cut5,
-    cut4,
-    process_text,
-    merge_short_text_in_array,
+    get_texts,
     get_spepc,
     load_model_config,
     get_project_path,
     has_omission,
+    logger,
+    i18n,
 )
-
-
-# 初始化日志信息
-logging.getLogger("markdown_it").setLevel(logging.ERROR)
-logging.getLogger("urllib3").setLevel(logging.ERROR)
-logging.getLogger("httpcore").setLevel(logging.ERROR)
-logging.getLogger("httpx").setLevel(logging.ERROR)
-logging.getLogger("asyncio").setLevel(logging.ERROR)
-logging.getLogger("charset_normalizer").setLevel(logging.ERROR)
-logging.getLogger("torchaudio._extension").setLevel(logging.ERROR)
-
-# 多语言
-i18n = I18nAuto()
 
 project_path = get_project_path()
 
@@ -236,10 +216,9 @@ def inference(
     text,
     text_language,
     model_name="旁白",
-    how_to_cut=i18n("按标点符号切"),
-    top_k=1,
-    top_p=0.5,
-    temperature=0.5,
+    top_k=30,
+    top_p=1,
+    temperature=1,
     ref_free=False,
 ):
     global curr_model_name
@@ -264,36 +243,18 @@ def inference(
     prompt_text = format_text(prompt_text, prompt_language)
     text = format_text(text, text_language)
 
-    # prompt_text = clean_text_inf(prompt_text, prompt_language)
-
     if not ref_free:
         prompt_text = prompt_text.strip("\n")
         if prompt_text[-1] not in splits:
             prompt_text += "。" if prompt_language != "en" else "."
         logger.info(i18n("实际输入的参考文本:"), prompt_text)
 
-    # text = replace_consecutive_punctuation(text)
     if text[0] not in splits and len(get_first(text)) < 4:
         text = "。" + text if text_language != "en" else "." + text
 
     logger.info(i18n("实际输入的目标文本:"), text)
 
-    if how_to_cut == i18n("凑四句一切"):
-        text = cut1(text)
-    elif how_to_cut == i18n("凑50字一切"):
-        text = cut2(text)
-    elif how_to_cut == i18n("按中文句号。切"):
-        text = cut3(text)
-    elif how_to_cut == i18n("按英文句号.切"):
-        text = cut4(text)
-    elif how_to_cut == i18n("按标点符号切"):
-        text = cut5(text)
-    while "\n\n" in text:
-        text = text.replace("\n\n", "\n")
-    logger.info(i18n("实际输入的目标文本(切句后):"), text)
-    texts = text.split("\n")
-    texts = process_text(texts)
-    texts = merge_short_text_in_array(texts, 15)
+    texts = get_texts(text, text_language)
 
     return do_inference(
         prompt_wav_path,
@@ -309,6 +270,28 @@ def inference(
 
 
 # 执行推理，合成音频
+"""
+top_k：
+
+作用：限制每次生成时只考虑概率最高的 k 个单词。
+控制方式：通过限制选择范围，使生成过程更集中于最可能的选项，减少生成内容的随机性。
+效果：较低的 top_k 值会使生成内容更确定、更保守，可能更符合训练数据的模式，但也可能显得单调。
+较高的 top_k 值会增加生成内容的多样性，但可能会引入一些不符合上下文的单词。
+top_p (核采样, nucleus sampling)：
+
+作用：限制生成时只考虑概率总和达到 p 的单词集合。
+控制方式：根据概率累积值选择单词，而不是固定数量的单词。这种方法允许根据概率分布的形状动态调整候选单词的数量。
+效果：较低的 top_p 值会使生成内容更确定，只考虑最可能的选项。较高的 top_p 值会增加生成内容的多样性，但可能会引入更多不确定性。
+temperature：
+
+作用：通过控制生成过程中的随机性来调整模型输出的多样性。
+控制方式：通过对预测概率分布进行缩放，使得模型对不同选项的区分度更大或更小。
+具体公式为： p_i' = p_i ^ (1 / temperature)，其中 p_i 是某个选项的原始概率。
+效果：较低的 temperature 值（接近于0）会使模型输出更确定，更倾向于选择最高概率的选项。
+较高的 temperature 值会使生成内容更加随机和多样化。
+"""
+
+
 def do_inference(
     prompt_wav_path,
     prompt_text,
@@ -317,7 +300,7 @@ def do_inference(
     text_language,
     top_k=1,
     top_p=1,
-    temperature=1,
+    temperature=0.8,
     ref_free=False,
 ):
     t0 = ttime()
@@ -354,22 +337,25 @@ def do_inference(
         phones1, bert1, norm_text1 = get_phones_and_bert(prompt_text, prompt_language)
 
     index = 0
-    max_try_again = 125
     try_again = 0
     count = 0
     step = 0
+    reduce_count = 0.03
+    reduce_step = 3
+
+    max_try_again = int((1 - 0.2) / reduce_count) * int((30 - 1) / reduce_step)
+
     pinyin_similarity_map = {}
+
     while index < len(texts):
-        text = texts[index]
-        if len(text.strip()) == 0:
+        text = texts[index].strip()
+        if len(text) == 0:
             index += 1
             continue
         if text[-1] not in splits:
             text += "。" if text_language != "en" else "."
 
-        logger.info(f"实际输入的目标文本(每句): {text}")
         phones2, bert2, norm_text2 = get_phones_and_bert(text, text_language)
-        logger.info(f"前端处理后的文本(每句): {norm_text2}")
 
         if not ref_free:
             bert = torch.cat([bert1, bert2], 1)
@@ -392,9 +378,9 @@ def do_inference(
                     all_phoneme_len,
                     None if ref_free else prompt,
                     bert,
-                    top_k=top_k + step,
-                    top_p=top_p + count,
-                    temperature=temperature + count,
+                    top_k=top_k - step,
+                    top_p=top_p - count,
+                    temperature=temperature - count,
                     early_stop_num=hz * max_sec,
                 )
             t3 = ttime()
@@ -413,27 +399,45 @@ def do_inference(
                 .numpy()[0, 0]
             )
 
-            max_audio = np.abs(audio).max()  # 简单防止16bit爆音
+            max_audio = np.abs(audio).max()  # Prevent 16-bit overflow
             if max_audio > 1:
                 audio /= max_audio
 
             temp_audio_path = os.path.join(
                 project_path, "tmp", "gen", "audio", f"temp_audio_{t2}.wav"
             )
-            if not os.path.exists(os.path.dirname(temp_audio_path)):
-                os.makedirs(os.path.dirname(temp_audio_path))
+            os.makedirs(os.path.dirname(temp_audio_path), exist_ok=True)
             sf.write(temp_audio_path, audio, hps.data.sampling_rate)
 
             asr_result = only_asr(temp_audio_path)
             _phones, _bert, _norm_text = get_phones_and_bert(asr_result, text_language)
 
-            is_continu, pinyin_similarity = has_omission(_norm_text, norm_text2)
+            is_continu, pinyin_similarity, gen_text_clean, text_clean = has_omission(
+                _norm_text, norm_text2
+            )
+
+            logger.info(f"""
+=========
+【输入目标】: {text}
+【处理之后】: {norm_text2}
+-----------------------------
+【try_again】  : {try_again}
+【top_k】      : {top_k + step}
+【top_p】      : {top_p + count}
+【temperature】: {temperature + count}
+-----------------------------
+生成文本：{gen_text_clean}
+输入文本：{text_clean}
+相似度：{pinyin_similarity}
+=========
+""")
+
             pinyin_similarity_map[pinyin_similarity] = audio
             if is_continu:
                 try_again += 1
-                count += 0.02
-                if try_again % 25 == 0:
-                    step += 2
+                count -= reduce_count
+                if try_again % int((1 - 0.2) / reduce_count) == 0:
+                    step -= reduce_count
                     count = 0
                 if try_again >= max_try_again:
                     index += 1

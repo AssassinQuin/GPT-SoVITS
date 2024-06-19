@@ -1,7 +1,7 @@
 {
     "旁白": {
-        "role": "旁白",
-        "model_path": "旁白",
+        "role": "旁白_7h",
+        "model_path": "旁白_7h",
         "prompt_language": "中文"
     }
 }

@@ -1,1 +1,1 @@
-/root/code/GPT-SoVITS/model/旁白/aside_e25_s11575.pth
+/root/code/GPT-SoVITS/model/旁白_7h/7h_e25_s30650.pth

@@ -8,5 +8,5 @@ else
 fi
 
 # 在后台运行新的脚本实例，并将输出重定向到 out.log
-nohup python auto_task/auto_task.py --novel_name shyj --start 1 --end 10 > out.log 2>&1 &
+nohup python auto_task/auto_task.py --novel_name shyj --start 21 --end 30 > out.log 2>&1 &
 echo "Started new instance of auto_task.py"
