@@ -19,3 +19,9 @@ ffprobe*
 tmp
 model
 *log
+TEMP
+*.wav
+*.log
+tmp
+audio
+model
