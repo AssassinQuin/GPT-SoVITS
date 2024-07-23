@@ -14,3 +14,9 @@ GPT_weights_v2
 SoVITS_weights_v2
 TEMP
 weight.json
+TEMP
+*.wav
+*.log
+tmp
+audio
+model
