@@ -19,55 +19,85 @@ special = [
 
 
 def clean_text(text, language, version=None):
-    if version is None:version=os.environ.get('version', 'v2')
+    if version is None:
+        version = os.environ.get("version", "v2")
     if version == "v1":
         symbols = symbols_v1.symbols
         language_module_map = {"zh": "chinese", "ja": "japanese", "en": "english"}
     else:
         symbols = symbols_v2.symbols
-        language_module_map = {"zh": "chinese2", "ja": "japanese", "en": "english", "ko": "korean","yue":"cantonese"}
+        language_module_map = {
+            "zh": "chinese2",
+            "ja": "japanese",
+            "en": "english",
+            "ko": "korean",
+            "yue": "cantonese",
+        }
 
-    if(language not in language_module_map):
-        language="en"
-        text=" "
+    if language not in language_module_map:
+        language = "en"
+        text = " "
     for special_s, special_l, target_symbol in special:
         if special_s in text and language == special_l:
             return clean_special(text, language, special_s, target_symbol, version)
-    language_module = __import__("text."+language_module_map[language],fromlist=[language_module_map[language]])
-    if hasattr(language_module,"text_normalize"):
+    language_module = __import__(
+        "text." + language_module_map[language],
+        fromlist=[language_module_map[language]],
+    )
+    if hasattr(language_module, "text_normalize"):
         norm_text = language_module.text_normalize(text)
     else:
-        norm_text=text
-    if language == "zh" or language=="yue":##########
+        norm_text = text
+    if language == "zh" or language == "yue":  ##########
         phones, word2ph = language_module.g2p(norm_text)
         assert len(phones) == sum(word2ph)
         assert len(norm_text) == len(word2ph)
     elif language == "en":
         phones = language_module.g2p(norm_text)
         if len(phones) < 4:
+<<<<<<< HEAD
             phones = [','] + phones
+=======
+            phones = [","] * (4 - len(phones)) + phones
+>>>>>>> c211b85 (duoren v3)
         word2ph = None
     else:
         phones = language_module.g2p(norm_text)
         word2ph = None
+<<<<<<< HEAD
     phones = ['UNK' if ph not in symbols else ph for ph in phones]
+=======
+
+    for ph in phones:
+        phones = ["UNK" if ph not in symbols else ph for ph in phones]
+>>>>>>> c211b85 (duoren v3)
     return phones, word2ph, norm_text
 
 
 def clean_special(text, language, special_s, target_symbol, version=None):
-    if version is None:version=os.environ.get('version', 'v2')
+    if version is None:
+        version = os.environ.get("version", "v2")
     if version == "v1":
         symbols = symbols_v1.symbols
         language_module_map = {"zh": "chinese", "ja": "japanese", "en": "english"}
     else:
         symbols = symbols_v2.symbols
-        language_module_map = {"zh": "chinese2", "ja": "japanese", "en": "english", "ko": "korean","yue":"cantonese"}
+        language_module_map = {
+            "zh": "chinese2",
+            "ja": "japanese",
+            "en": "english",
+            "ko": "korean",
+            "yue": "cantonese",
+        }
 
     """
     特殊静音段sp符号处理
     """
     text = text.replace(special_s, ",")
-    language_module = __import__("text."+language_module_map[language],fromlist=[language_module_map[language]])
+    language_module = __import__(
+        "text." + language_module_map[language],
+        fromlist=[language_module_map[language]],
+    )
     norm_text = language_module.text_normalize(text)
     phones = language_module.g2p(norm_text)
     new_ph = []
@@ -81,11 +111,12 @@ def clean_special(text, language, special_s, target_symbol, version=None):
 
 
 def text_to_sequence(text, language, version=None):
-    version = os.environ.get('version',version)
-    if version is None:version='v2'
+    version = os.environ.get("version", version)
+    if version is None:
+        version = "v2"
     phones = clean_text(text)
     return cleaned_text_to_sequence(phones, version)
 
 
 if __name__ == "__main__":
-    print(clean_text("你好%啊啊啊额、还是到付红四方。", "zh"))
+    print(clean_text("既然是特殊小队，那他们被虐一虐，也是理所当然的。", "zh"))
