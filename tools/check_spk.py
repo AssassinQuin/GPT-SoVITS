@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 # 常量
 API_URL = "http://localhost:11434/api/generate"
-MODEL_NAME = "qwen2.5:latest"
+MODEL_NAME = "wangshenzhi/gemma2-9b-chinese-chat"
 
 
 def post_request_with_retries(
@@ -369,6 +369,10 @@ def process_directory(
 
 
 def main():
+    # book_lisk = [
+    #     # ("藏海花", 1),
+    #     ("藏海花2", 1),
+    # ]
     parser = argparse.ArgumentParser(description="小说 txt 文件处理程序")
     parser.add_argument("book_name", type=str, help="小说名")
     parser.add_argument(

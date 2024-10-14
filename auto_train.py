@@ -556,13 +556,13 @@ def train_1Bb(model_list):
     # def open1Bb
     for name in model_list:
         print(f"GPT训练：{name}")
-        batch = 3
-        epoch = 35
+        batch = 2
+        epoch = 40
         exp_name = name
         dpo = False
         save_latest = True
         save_every_weights = True
-        save_every_epoch = 35
+        save_every_epoch = 40
         gpu_numbers = "0"
         pretrained_s1 = "GPT_SoVITS/pretrained_models/gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt"
         for status in open1Bb(
@@ -585,13 +585,13 @@ def train_1Bb(model_list):
 # def open1Ba(
 def train_1Ba(model_list):
     for name in model_list:
-        batch_size = 3
-        total_epoch = 16
+        batch_size = 2
+        total_epoch = 24
         exp_name = name
         text_low_lr_rate = 0.4
         if_save_latest = True
         if_save_every_weights = True
-        save_every_epoch = 16
+        save_every_epoch = 24
         gpu_numbers1Ba = "0"
         pretrained_s2G = (
             "GPT_SoVITS/pretrained_models/gsv-v2final-pretrained/s2G2333k.pth"
@@ -618,16 +618,16 @@ def train_1Ba(model_list):
 
 if __name__ == "__main__":
     # 获取 output 目录下除开 asr_opt 的其他目录名
-    # output_dir = "/root/code/GPT-SoVITS/output"
-    # model_list = [
-    #     name
-    #     for name in os.listdir(output_dir)
-    #     if os.path.isdir(os.path.join(output_dir, name)) and name != "asr_opt"
-    # ]
+    output_dir = "/root/code/GPT-SoVITS/output"
+    model_list = [
+        name
+        for name in os.listdir(output_dir)
+        if os.path.isdir(os.path.join(output_dir, name)) and name != "asr_opt"
+    ]
     # # 处理数据
-    # train_abc(model_list)
-    model_list = ["丹恒"]
+    train_abc(model_list)
+    # model_list = ["丹恒"]
     # 训练 SoVITS
-    # train_1Ba(model_list)
+    train_1Ba(model_list)
     # 训练 GPT
     train_1Bb(model_list)
