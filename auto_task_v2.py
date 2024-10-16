@@ -211,11 +211,11 @@ def process_text_line(
     """
     global pinyin_similarity_map, TARGET_SAMPLE_RATE
 
-    parsed_texts = get_texts(text_line, remove_punc=True)
+    parsed_texts = get_texts(text_line, ignore_punctuation=True)
     for text in parsed_texts:
         try_count = 0
         original_text = text
-        cleaned_text = clear_text(text, remove_punc=True)
+        cleaned_text = clear_text(text, ignore_punctuation=True)
 
         if not cleaned_text:
             continue
@@ -228,7 +228,7 @@ def process_text_line(
             if returned_sr != TARGET_SAMPLE_RATE:
                 audio_tensor = torch.from_numpy(generated_audio).unsqueeze(0)
                 resampled_tensor = resample_audio(
-                    audio_tensor, orig_sr=returned_sr, target_sr=TARGET_SAMPLE_RATE
+                    audio_tensor, original_sr=returned_sr, target_sr=TARGET_SAMPLE_RATE
                 )
                 generated_audio = resampled_tensor.squeeze(0).numpy()
 
@@ -318,13 +318,14 @@ def process_chapter(book_name: str, chapter_index: int) -> None:
 
     for item in chapter_map_list:
         sanitized_item = {
-            clear_text(key, remove_punc=True): value for key, value in item.items()
+            clear_text(key, ignore_punctuation=True): value
+            for key, value in item.items()
         }
         chapter_map.update(sanitized_item)
 
     # 获取所有文本行
     if not bookname_to_role:
-        texts = get_texts(file_content, remove_punc=True)
+        texts = get_texts(file_content, ignore_punctuation=True)
     else:
         texts = get_texts(file_content)
 
@@ -341,8 +342,7 @@ def process_chapter(book_name: str, chapter_index: int) -> None:
     ) as progress_bar:
         while current_index < total_texts:
             line = texts[current_index]
-            cleaned_line = clear_text(line, remove_punc=True)
-            speaker_role = "旁白1"
+            cleaned_line = clear_text(line, ignore_punctuation=True)
 
             # 获取角色对应的说话人
             book_role = chapter_map.get(cleaned_line, {}).get("role", "")
