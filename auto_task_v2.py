@@ -363,17 +363,15 @@ def process_chapter(book_name: str, chapter_index: int) -> None:
     # 保存最终音频文件
     formatted_chapter_index = f"{chapter_index:02d}"
     output_path = os.path.join(
-        f"./tmp/{book_name}/gen", f"{book_name}_chapter_{formatted_chapter_index}.wav"
+        f"./tmp/{book_name}/gen", f"{book_name}_{formatted_chapter_index}.wav"
     )
     torchaudio.save(output_path, combined_audio, TARGET_SAMPLE_RATE)
     logger.info(f"文件已保存到 {output_path}")
 
     # 记录处理日志
     process_log_path = f"./tmp/{book_name}/process.txt"
-    with open(process_log_path, "a", encoding="utf-8") as process_log:
-        process_log.write(
-            f"Chapter {chapter_index} processed and saved to {output_path}\n"
-        )
+    with open(process_log_path, "w", encoding="utf-8") as process_log:
+        process_log.write(f"{chapter_index}")
 
 
 def main() -> None:
@@ -390,7 +388,23 @@ def main() -> None:
     with open(task_list_file, "r", encoding="utf-8-sig") as f:
         task_list = json.load(f)
 
-    for book_name, start_chapter_idx in task_list:
+    for book_name in task_list:
+        # 记录处理日志路径
+        process_log_path = f"./tmp/{book_name}/process.txt"
+        # 确保书籍处理目录存在
+        os.makedirs(os.path.dirname(process_log_path), exist_ok=True)
+
+        # 读取开始的章节索引，如果日志文件存在
+        if os.path.exists(process_log_path):
+            with open(process_log_path, "r", encoding="utf-8") as process_log:
+                last_processed_chapter = process_log.read().strip()
+                if last_processed_chapter.isdigit():
+                    start_chapter_idx = int(last_processed_chapter) + 1
+                else:
+                    start_chapter_idx = 1
+        else:
+            start_chapter_idx = 1
+
         current_book_name = book_name
         os.makedirs(f"./tmp/{book_name}/gen", exist_ok=True)
         data_dir = f"./tmp/{book_name}/data"

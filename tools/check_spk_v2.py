@@ -6,7 +6,7 @@ import logging
 from tqdm import tqdm
 from tools.auto_task_help_v2 import clear_text
 import argparse
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 # 配置日志
 logging.basicConfig(
@@ -21,7 +21,7 @@ MODEL_NAME = "wangshenzhi/gemma2-9b-chinese-chat"
 
 def post_request_with_retries(
     prompt: str, max_retries: int = 3, timeout: int = 10
-) -> Any:
+) -> Optional[Dict[str, Any]]:
     """发送POST请求，并在失败时重试。"""
     payload = {
         "model": MODEL_NAME,
@@ -165,10 +165,14 @@ def construct_check_prompt(
     return prompt
 
 
-def construct_clarification_prompt(
-    context: str, first_role_name: str, second_role_name: str, sentence: str
+def construct_comprehensive_prompt(
+    context: str,
+    sentence: str,
+    first_role: Dict[str, str],
+    second_role: Dict[str, str],
+    top_roles: str,
 ) -> str:
-    """构造用于澄清的提示语（Prompt）。"""
+    """构造用于综合判断的提示语（Prompt）。"""
     prompt = f"""
 【原文】：
 {context}
@@ -176,20 +180,25 @@ def construct_clarification_prompt(
 【句子】：
 【{sentence}】
 
-【已识别角色】：
-- 第一判断的角色名称为【{first_role_name}】。
-- 第二判断的角色名称为【{second_role_name}】。
+【第一判断角色】：
+{{"role": "{first_role['role']}", "gender": "{first_role['gender']}" }}
+
+【第二判断角色】：
+{{"role": "{second_role['role']}", "gender": "{second_role['gender']}" }}
+
+【角色列表】：
+{top_roles}
 
 【任务描述】：
-请根据原文内容，决定哪个角色名称更符合句子【{sentence}】的说话者，并确认该角色的性别。请严格按照以下步骤执行：
+请综合第一判断和第二判断的结果，结合原文内容和已有的角色信息，确定句子【{sentence}】的最终说话者。请严格按照以下步骤执行：
 
-### 步骤 1：角色评估
-1.1 比较【{first_role_name}】和【{second_role_name}】在上下文中的相关性和适用性。
+### 步骤 1：角色综合评估
+1.1 分析第一判断的角色和第二判断的角色在上下文中的相关性和适用性。
 
 1.2 确定哪个角色更有可能是该句子的说话者。
 
 ### 步骤 2：性别确认
-2.1 根据上下文中对该角色的描述，确认角色的性别。性别结果必须为 "男"、"女" 或 "未知"。
+2.1 根据上下文中对最终确定角色的描述，确认其性别。性别结果必须为 "男"、"女" 或 "未知"。
 
 2.2 如果无法从上下文中推断出性别，请返回 "未知"。
 
@@ -207,43 +216,59 @@ def construct_clarification_prompt(
 def process_sentence(
     sentence: str, context: str, top_roles: str
 ) -> Dict[str, Dict[str, str]]:
-    """处理单个句子，识别角色和性别。"""
+    """处理单个句子，识别角色和性别，采用三层思维逻辑。"""
     result = {}
     try:
-        # 第一次请求
-        prompt = construct_prompt(sentence, context, top_roles)
-        response_content = post_request_with_retries(prompt)
-        if response_content:
-            first_role_name = response_content.get("role", "未知")
-            gender = response_content.get("gender", "未知")
-            result[clear_text(sentence, True)] = {
-                "role": first_role_name,
-                "gender": gender,
-                "content": context,
-            }
+        # 第一层思维：初步识别
+        prompt1 = construct_prompt(sentence, context, top_roles)
+        response1 = post_request_with_retries(prompt1)
+        if not response1:
+            return result
+        first_role_name = response1.get("role", "未知")
+        first_gender = response1.get("gender", "未知")
 
-            # 第二次检查
-            check_prompt = construct_check_prompt(
-                context, sentence, first_role_name, top_roles
+        # 第二层思维：验证与扩展
+        check_prompt = construct_check_prompt(
+            context, sentence, first_role_name, top_roles
+        )
+        response2 = post_request_with_retries(check_prompt)
+        if not response2:
+            return result
+        second_role_name = response2.get("role", "未知")
+        second_gender = response2.get("gender", "未知")
+
+        # 初始化中间结果
+        intermediate_role = first_role_name
+        intermediate_gender = first_gender
+
+        # 如果第一层和第二层结果不一致，进行第三层思维
+        if first_role_name != second_role_name:
+            # 第三层思维：综合判断
+            comprehensive_prompt = construct_comprehensive_prompt(
+                context,
+                sentence,
+                {"role": first_role_name, "gender": first_gender},
+                {"role": second_role_name, "gender": second_gender},
+                top_roles,
             )
-            check_response_content = post_request_with_retries(check_prompt)
-            if check_response_content:
-                second_role_name = check_response_content.get("role", "未知")
-                second_gender = check_response_content.get("gender", "未知")
+            response3 = post_request_with_retries(comprehensive_prompt)
+            if response3:
+                final_role = response3.get("role", "未知")
+                final_gender = response3.get("gender", "未知")
+            else:
+                final_role = "未知"
+                final_gender = "未知"
+        else:
+            # 如果一致，直接使用第一层结果
+            final_role = first_role_name
+            final_gender = first_gender
 
-                # 如果两个角色名不同，则请求澄清
-                if first_role_name != second_role_name:
-                    clarification_prompt = construct_clarification_prompt(
-                        context, first_role_name, second_role_name, sentence
-                    )
-                    clarification_response = post_request_with_retries(
-                        clarification_prompt
-                    )
-                    if clarification_response:
-                        final_role_name = clarification_response.get("role", "未知")
-                        final_gender = clarification_response.get("gender", "未知")
-                        result[clear_text(sentence, True)]["role"] = final_role_name
-                        result[clear_text(sentence, True)]["gender"] = final_gender
+        # 填充最终结果
+        result[clear_text(sentence, True)] = {
+            "role": final_role,
+            "gender": final_gender,
+            "content": context,
+        }
 
     except Exception as e:
         logger.error(f"处理句子时出错: {e}")
@@ -292,7 +317,7 @@ def process_file(
             sentence = (
                 sentence.replace("……", "。").replace("。。", "。").replace("、", "，")
             )
-            if sentence[-1] not in "，。！？":
+            if sentence and sentence[-1] not in "，。！？":
                 continue
 
             sentence = sentence.strip()

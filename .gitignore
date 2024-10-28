@@ -20,8 +20,12 @@ tmp
 model
 *log
 TEMP
-*.wav
-*.log
+*wav
+*log
 tmp
 audio
 model
+out.log
+output.wav
+role_map.json
+*txt

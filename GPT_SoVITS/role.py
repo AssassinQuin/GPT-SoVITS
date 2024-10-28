@@ -52,9 +52,9 @@ def gen_role(role_json_path):
     # # 打印或保存role_map以供验证
     # print(json.dumps(role_map, ensure_ascii=False, indent=4))
 
-    # 或者保存到一个新的JSON文件中
-    with open("role_map.json", "w", encoding="utf-8") as f:
-        json.dump(role_map, f, ensure_ascii=False, indent=4)
+    # # 或者保存到一个新的JSON文件中
+    # with open("role_map.json", "w", encoding="utf-8") as f:
+    #     json.dump(role_map, f, ensure_ascii=False, indent=4)
 
     return role_map
 

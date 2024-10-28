@@ -55,22 +55,14 @@ def clean_text(text, language, version=None):
     elif language == "en":
         phones = language_module.g2p(norm_text)
         if len(phones) < 4:
-<<<<<<< HEAD
-            phones = [','] + phones
-=======
             phones = [","] * (4 - len(phones)) + phones
->>>>>>> c211b85 (duoren v3)
         word2ph = None
     else:
         phones = language_module.g2p(norm_text)
         word2ph = None
-<<<<<<< HEAD
-    phones = ['UNK' if ph not in symbols else ph for ph in phones]
-=======
 
     for ph in phones:
         phones = ["UNK" if ph not in symbols else ph for ph in phones]
->>>>>>> c211b85 (duoren v3)
     return phones, word2ph, norm_text
 
 

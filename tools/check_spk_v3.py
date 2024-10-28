@@ -5,8 +5,7 @@ import json
 import logging
 from tqdm import tqdm
 from tools.auto_task_help_v2 import clear_text
-import argparse
-from typing import Dict, Any
+from typing import Dict, Any, Optional, List
 
 # 配置日志
 logging.basicConfig(
@@ -18,10 +17,15 @@ logger = logging.getLogger(__name__)
 API_URL = "http://localhost:11434/api/generate"
 MODEL_NAME = "wangshenzhi/gemma2-9b-chinese-chat"
 
+CHECK_SPK_LIST_PATH = "tmp/check_spk_list.json"  # 默认的check_spk_list.json路径
+
+DEFAULT_START_IDX = 1
+DEFAULT_TOP_N = 25
+
 
 def post_request_with_retries(
     prompt: str, max_retries: int = 3, timeout: int = 10
-) -> Any:
+) -> Optional[Dict[str, Any]]:
     """发送POST请求，并在失败时重试。"""
     payload = {
         "model": MODEL_NAME,
@@ -165,10 +169,14 @@ def construct_check_prompt(
     return prompt
 
 
-def construct_clarification_prompt(
-    context: str, first_role_name: str, second_role_name: str, sentence: str
+def construct_comprehensive_prompt(
+    context: str,
+    sentence: str,
+    first_role: Dict[str, str],
+    second_role: Dict[str, str],
+    top_roles: str,
 ) -> str:
-    """构造用于澄清的提示语（Prompt）。"""
+    """构造用于综合判断的提示语（Prompt）。"""
     prompt = f"""
 【原文】：
 {context}
@@ -176,20 +184,25 @@ def construct_clarification_prompt(
 【句子】：
 【{sentence}】
 
-【已识别角色】：
-- 第一判断的角色名称为【{first_role_name}】。
-- 第二判断的角色名称为【{second_role_name}】。
+【第一判断角色】：
+{{"role": "{first_role['role']}", "gender": "{first_role['gender']}" }}
+
+【第二判断角色】：
+{{"role": "{second_role['role']}", "gender": "{second_role['gender']}" }}
+
+【角色列表】：
+{top_roles}
 
 【任务描述】：
-请根据原文内容，决定哪个角色名称更符合句子【{sentence}】的说话者，并确认该角色的性别。请严格按照以下步骤执行：
+请综合第一判断和第二判断的结果，结合原文内容和已有的角色信息，确定句子【{sentence}】的最终说话者。请严格按照以下步骤执行：
 
-### 步骤 1：角色评估
-1.1 比较【{first_role_name}】和【{second_role_name}】在上下文中的相关性和适用性。
+### 步骤 1：角色综合评估
+1.1 分析第一判断的角色和第二判断的角色在上下文中的相关性和适用性。
 
 1.2 确定哪个角色更有可能是该句子的说话者。
 
 ### 步骤 2：性别确认
-2.1 根据上下文中对该角色的描述，确认角色的性别。性别结果必须为 "男"、"女" 或 "未知"。
+2.1 根据上下文中对最终确定角色的描述，确认其性别。性别结果必须为 "男"、"女" 或 "未知"。
 
 2.2 如果无法从上下文中推断出性别，请返回 "未知"。
 
@@ -207,43 +220,59 @@ def construct_clarification_prompt(
 def process_sentence(
     sentence: str, context: str, top_roles: str
 ) -> Dict[str, Dict[str, str]]:
-    """处理单个句子，识别角色和性别。"""
+    """处理单个句子，识别角色和性别，采用三层思维逻辑。"""
     result = {}
     try:
-        # 第一次请求
-        prompt = construct_prompt(sentence, context, top_roles)
-        response_content = post_request_with_retries(prompt)
-        if response_content:
-            first_role_name = response_content.get("role", "未知")
-            gender = response_content.get("gender", "未知")
-            result[clear_text(sentence, True)] = {
-                "role": first_role_name,
-                "gender": gender,
-                "content": context,
-            }
+        # 第一层思维：初步识别
+        prompt1 = construct_prompt(sentence, context, top_roles)
+        response1 = post_request_with_retries(prompt1)
+        if not response1:
+            return result
+        first_role_name = response1.get("role", "未知")
+        first_gender = response1.get("gender", "未知")
 
-            # 第二次检查
-            check_prompt = construct_check_prompt(
-                context, sentence, first_role_name, top_roles
+        # 第二层思维：验证与扩展
+        check_prompt = construct_check_prompt(
+            context, sentence, first_role_name, top_roles
+        )
+        response2 = post_request_with_retries(check_prompt)
+        if not response2:
+            return result
+        second_role_name = response2.get("role", "未知")
+        second_gender = response2.get("gender", "未知")
+
+        # 初始化中间结果
+        intermediate_role = first_role_name
+        intermediate_gender = first_gender
+
+        # 如果第一层和第二层结果不一致，进行第三层思维
+        if first_role_name != second_role_name:
+            # 第三层思维：综合判断
+            comprehensive_prompt = construct_comprehensive_prompt(
+                context,
+                sentence,
+                {"role": first_role_name, "gender": first_gender},
+                {"role": second_role_name, "gender": second_gender},
+                top_roles,
             )
-            check_response_content = post_request_with_retries(check_prompt)
-            if check_response_content:
-                second_role_name = check_response_content.get("role", "未知")
-                second_gender = check_response_content.get("gender", "未知")
+            response3 = post_request_with_retries(comprehensive_prompt)
+            if response3:
+                final_role = response3.get("role", "未知")
+                final_gender = response3.get("gender", "未知")
+            else:
+                final_role = "未知"
+                final_gender = "未知"
+        else:
+            # 如果一致，直接使用第一层结果
+            final_role = first_role_name
+            final_gender = first_gender
 
-                # 如果两个角色名不同，则请求澄清
-                if first_role_name != second_role_name:
-                    clarification_prompt = construct_clarification_prompt(
-                        context, first_role_name, second_role_name, sentence
-                    )
-                    clarification_response = post_request_with_retries(
-                        clarification_prompt
-                    )
-                    if clarification_response:
-                        final_role_name = clarification_response.get("role", "未知")
-                        final_gender = clarification_response.get("gender", "未知")
-                        result[clear_text(sentence, True)]["role"] = final_role_name
-                        result[clear_text(sentence, True)]["gender"] = final_gender
+        # 填充最终结果
+        result[clear_text(sentence, True)] = {
+            "role": final_role,
+            "gender": final_gender,
+            "content": context,
+        }
 
     except Exception as e:
         logger.error(f"处理句子时出错: {e}")
@@ -256,7 +285,7 @@ def process_file(
     output_dir: str,
     book_data_dir: str,
     current_chapter: int,
-    top_n: int = 15,
+    top_n: int = DEFAULT_TOP_N,
 ):
     """处理单个文件以提取对话并分析发言者。"""
     try:
@@ -264,10 +293,10 @@ def process_file(
             content = f.read()
     except FileNotFoundError:
         logger.error(f"文件未找到: {file_path}")
-        return
+        return False
     except Exception as e:
         logger.error(f"读取文件 {file_path} 时出错: {e}")
-        return
+        return False
 
     book_data_file = os.path.join(book_data_dir, "book_data.json")
     if not os.path.exists(book_data_file):
@@ -292,7 +321,7 @@ def process_file(
             sentence = (
                 sentence.replace("……", "。").replace("。。", "。").replace("、", "，")
             )
-            if sentence[-1] not in "，。！？":
+            if sentence and sentence[-1] not in "，。！？":
                 continue
 
             sentence = sentence.strip()
@@ -328,6 +357,7 @@ def process_file(
             json.dump(results, out_f, ensure_ascii=False, indent=4)
     except Exception as e:
         logger.error(f"写入输出文件 {output_file} 时出错: {e}")
+        return False
 
     # 更新书籍数据文件
     try:
@@ -335,10 +365,19 @@ def process_file(
             json.dump(book_data, out_f, ensure_ascii=False, indent=4)
     except Exception as e:
         logger.error(f"更新书籍数据文件 {book_data_file} 时出错: {e}")
+        return False
+
+    return True
 
 
 def process_directory(
-    input_dir: str, output_dir: str, book_data_dir: str, start_idx: int, top_n: int = 15
+    input_dir: str,
+    output_dir: str,
+    book_data_dir: str,
+    start_idx: int,
+    top_n: int,
+    book_name,
+    check_spk_list,
 ):
     """处理目录中的所有.txt文件。"""
     if not os.path.exists(output_dir):
@@ -356,8 +395,9 @@ def process_directory(
         )
     except Exception as e:
         logger.error(f"列出目录 {input_dir} 中的文件时出错: {e}")
-        return
+        return False
 
+    processed = False
     for txt_file in tqdm(txt_files, desc="处理文件"):
         try:
             file_idx = (
@@ -371,33 +411,138 @@ def process_directory(
 
         if file_idx >= start_idx:
             file_path = os.path.join(input_dir, txt_file)
-            process_file(file_path, output_dir, book_data_dir, file_idx, top_n=top_n)
+            success = process_file(
+                file_path, output_dir, book_data_dir, file_idx, top_n=top_n
+            )
+            if success:
+                # 更新start_idx至下一章节
+                start_idx = file_idx + 1
+                processed = True
+                update_status(check_spk_list, book_name, "执行中", start_idx=start_idx)
+                with open(CHECK_SPK_LIST_PATH, "w", encoding="utf-8-sig") as f:
+                    json.dump(check_spk_list, f, ensure_ascii=False, indent=4)
+            else:
+                logger.error(f"处理文件失败: {file_path}")
+                # 如果处理失败，停止当前书籍的处理
+                break
+
+    return processed
+
+
+def update_status(
+    check_spk_list: List[Dict[str, Any]],
+    book_name: str,
+    status: str,
+    start_idx: Optional[int] = None,
+    top_n: Optional[int] = None,
+):
+    """更新check_spk_list.json中指定书籍的状态和进度。"""
+    for book in check_spk_list:
+        if book.get("book_name") == book_name:
+            book["status"] = status
+            if start_idx is not None:
+                book["start_idx"] = start_idx
+            if top_n is not None:
+                book["top_n"] = top_n
+            return
+    # 如果书籍不存在，则添加新项，默认status为“等待中”
+    new_entry = {"book_name": book_name, "status": status}
+    if start_idx is not None:
+        new_entry["start_idx"] = start_idx
+    if top_n is not None:
+        new_entry["top_n"] = top_n
+    check_spk_list.append(new_entry)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="小说 txt 文件处理程序")
-    parser.add_argument("book_name", type=str, help="小说名")
-    parser.add_argument(
-        "--start_idx", type=int, help="起始章节", default=1, required=False
-    )
-    parser.add_argument(
-        "--top_n", type=int, help="获取前N个角色", default=25, required=False
-    )
-
-    args = parser.parse_args()
-    book_name = args.book_name
-    start_idx = args.start_idx  # 从指定的章节开始处理
-    top_n = args.top_n
-
-    book_data_dir = os.path.join("tmp", book_name)
-    input_dir = os.path.join(book_data_dir, "data")
-    output_dir = os.path.join(book_data_dir, "role")
-
-    if not os.path.exists(book_data_dir):
-        logger.error(f"书籍数据目录不存在: {book_data_dir}")
+    # 读取check_spk_list.json
+    if not os.path.exists(CHECK_SPK_LIST_PATH):
+        logger.error(f"check_spk_list.json文件不存在: {CHECK_SPK_LIST_PATH}")
         return
 
-    process_directory(input_dir, output_dir, book_data_dir, start_idx, top_n=top_n)
+    try:
+        with open(CHECK_SPK_LIST_PATH, "r", encoding="utf-8-sig") as f:
+            check_spk_list = json.load(f)
+    except json.JSONDecodeError as e:
+        logger.error(f"解析 JSON 文件失败: {CHECK_SPK_LIST_PATH}")
+        logger.error(e)
+        return
+    except Exception as e:
+        logger.error(f"读取check_spk_list.json文件时出错: {e}")
+        return
+
+    # 确保每本书都有status，若没有，设置为“等待中”
+    for book in check_spk_list:
+        if "status" not in book:
+            logger.info(
+                f"书籍 '{book.get('book_name', '未知')}' 缺少 'status' 字段，设置为 '等待中'"
+            )
+            book["status"] = "等待中"
+
+    # 遍历每本书
+    for book in check_spk_list:
+        book_name = book.get("book_name")
+        if not book_name:
+            logger.warning("存在没有 'book_name' 的条目，跳过。")
+            continue
+        status = book.get("status", "等待中")  # 确保有默认值
+        start_idx = book.get("start_idx", DEFAULT_START_IDX)
+        top_n = book.get("top_n", DEFAULT_TOP_N)
+
+        if status == "已完成":
+            logger.info(f"书籍已完成处理，跳过: {book_name}")
+            continue
+
+        logger.info(f"开始处理书籍: {book_name}")
+        # 更新状态为“执行中”
+        update_status(
+            check_spk_list, book_name, "执行中", start_idx=start_idx, top_n=top_n
+        )
+
+        # 保存更新后的状态
+        try:
+            with open(CHECK_SPK_LIST_PATH, "w", encoding="utf-8-sig") as f:
+                json.dump(check_spk_list, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            logger.error(f"更新check_spk_list.json文件时出错: {e}")
+            continue
+
+        book_data_dir = os.path.join("tmp", book_name)
+        input_dir = os.path.join(book_data_dir, "data")
+        output_dir = os.path.join(book_data_dir, "role")
+
+        if not os.path.exists(book_data_dir):
+            logger.error(f"书籍数据目录不存在: {book_data_dir}")
+            # 将状态回滚为“等待中”
+            update_status(
+                check_spk_list, book_name, "等待中", start_idx=start_idx, top_n=top_n
+            )
+            continue
+
+        processed = process_directory(
+            input_dir,
+            output_dir,
+            book_data_dir,
+            start_idx,
+            top_n,
+            book_name,
+            check_spk_list,
+        )
+        if processed:
+            # 更新状态为“已完成”并重置start_idx
+            update_status(check_spk_list, book_name, "已完成")
+            logger.info(f"完成处理书籍: {book_name}")
+        else:
+            logger.error(f"处理书籍时发生错误，状态保持为“执行中”: {book_name}")
+
+        # 保存更新后的状态
+        try:
+            with open(CHECK_SPK_LIST_PATH, "w", encoding="utf-8-sig") as f:
+                json.dump(check_spk_list, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            logger.error(f"更新check_spk_list.json文件时出错: {e}")
+
+    logger.info("所有书籍处理完成.")
 
 
 if __name__ == "__main__":

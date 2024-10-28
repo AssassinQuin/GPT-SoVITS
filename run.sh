@@ -13,4 +13,4 @@ fi
 # nohup /root/miniconda3/envs/GPTSoVits/bin/python auto_task_v2.py --book_name 我在精神病院学斩神-三九音域 --start_idx 829 --end_idx 900 > out.log 2>&1 &
 # nohup /root/miniconda3/envs/GPTSoVits/bin/python auto_task_v3.py  诡秘之主  301  400 > out.log 2>&1 &
 
-nohup /root/miniconda3/envs/GPTSoVits/bin/python auto_task_v2.py > out.log 2>&1 &
+nohup /root/miniconda3/envs/GPTSoVits/bin/python auto_task.py > out.log 2>&1 &
