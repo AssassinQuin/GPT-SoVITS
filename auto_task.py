@@ -12,16 +12,13 @@ from tqdm import tqdm
 from loguru import logger
 from torchaudio import transforms
 
-# from GPT_SoVITS.inference_v2 import TTSGenerator
+from GPT_SoVITS.inference_v2 import TTSGenerator
 
-from GPT_SoVITS.inference import inference
 from tools.auto_task_help_v2 import (
     get_texts,
     has_omission,
     clear_text,
 )
-
-# 确保导入所有需要的函数和模块
 
 
 class AudioProcessor:
@@ -37,7 +34,10 @@ class AudioProcessor:
         # 当前书籍名称
         self.current_book_name: str = ""
         self.default_spk = "旁白1"
-        # self.model = TTSGenerator()
+        self.model = TTSGenerator()
+
+        self.task_list = self.load_task_list()
+        self.current_task = None
 
     def load_task_list(self) -> List[Dict[str, Any]]:
         """
@@ -91,6 +91,16 @@ class AudioProcessor:
         if audio.ndim == 2:
             audio = audio.squeeze()
 
+        # 将音频数据转换为浮点数，并缩放到 [-1.0, 1.0] 范围
+        if audio.dtype == np.int16:
+            audio = audio.astype(np.float32) / 32768.0
+        elif audio.dtype == np.int32:
+            audio = audio.astype(np.float32) / 2147483648.0
+        elif audio.dtype == np.uint8:
+            audio = (audio.astype(np.float32) - 128) / 128.0
+        elif audio.dtype not in [np.float32, np.float64]:
+            raise ValueError(f"Unsupported audio dtype: {audio.dtype}")
+
         meter = pyln.Meter(sample_rate)
         block_size = meter.block_size * sample_rate
 
@@ -99,7 +109,7 @@ class AudioProcessor:
 
         integrated_loudness = meter.integrated_loudness(audio)
         normalized_audio = pyln.normalize.loudness(audio, integrated_loudness, -16.0)
-        return torch.from_numpy(normalized_audio)
+        return torch.from_numpy(normalized_audio.astype(np.float32))
 
     def prepare_audio(
         self, audio_tensor: torch.Tensor, sample_rate: int
@@ -107,7 +117,13 @@ class AudioProcessor:
         if audio_tensor.ndim == 1:
             audio_tensor = audio_tensor.unsqueeze(0)
 
-        normalized_audio = self.normalize_loudness(audio_tensor.numpy(), sample_rate)
+        # 确保音频数据是浮点数类型
+        if audio_tensor.dtype != torch.float32 and audio_tensor.dtype != torch.float64:
+            audio_tensor = audio_tensor.float() / 32768.0  # 假设原始数据为 int16
+
+        normalized_audio = self.normalize_loudness(
+            audio_tensor.cpu().numpy(), sample_rate
+        )
         return normalized_audio
 
     def save_audio(self, spk: str, audio_tensor: torch.Tensor, text_line: str) -> None:
@@ -132,8 +148,18 @@ class AudioProcessor:
         temp_wav_filename = f"{sanitized_book_name}_{sanitized_speaker}_{timestamp}.wav"
         temp_wav_path = os.path.join(speaker_dir, temp_wav_filename)
 
+        # 如果音频是浮点数类型，转换回 int16 以保存
+        if audio_tensor.dtype in [torch.float32, torch.float64]:
+            audio_np = audio_tensor.squeeze(0).numpy()
+            audio_np = np.clip(audio_np, -1.0, 1.0)
+            audio_np = (audio_np * 32767).astype(np.int16)
+        else:
+            audio_np = audio_tensor.squeeze(0).numpy()
+
         torchaudio.save(
-            temp_wav_path, audio_tensor.unsqueeze(0), self.target_sample_rate
+            temp_wav_path,
+            torch.from_numpy(audio_np).unsqueeze(0),
+            self.target_sample_rate,
         )
 
         # 保存对应的文本文件
@@ -159,19 +185,6 @@ class AudioProcessor:
                 return json.load(f)
         return default
 
-    @staticmethod
-    def delete_files(wav_file: str) -> None:
-        normalized_txt = f"{os.path.splitext(wav_file)[0]}.normalized.txt"
-
-        logger.info(f"删除文件: {wav_file}")
-        os.remove(wav_file)
-
-        if os.path.isfile(normalized_txt):
-            logger.info(f"删除文件: {normalized_txt}")
-            os.remove(normalized_txt)
-        else:
-            logger.warning(f"对应的 .normalized.txt 文件不存在: {normalized_txt}")
-
     def process_text_line(
         self, text_line: str, audio_fragments: List[torch.Tensor], speaker: str
     ) -> List[torch.Tensor]:
@@ -196,18 +209,13 @@ class AudioProcessor:
                 continue
 
             while True:
+                if original_text == "":
+                    break
                 # 调用 TTS 推理函数
-                returned_sr, generated_audio = inference(speaker, original_text)
-
-                # 重采样如果返回的采样率不同
-                if returned_sr != self.target_sample_rate:
-                    audio_tensor = torch.from_numpy(generated_audio).unsqueeze(0)
-                    resampled_tensor = self.resample_audio(
-                        audio_tensor,
-                        original_sr=returned_sr,
-                        target_sr=self.target_sample_rate,
-                    )
-                    generated_audio = resampled_tensor.squeeze(0).numpy()
+                returned_sr, generated_audio = self.model.inference(
+                    speaker, original_text
+                )
+                self.target_sample_rate = returned_sr
 
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
@@ -218,6 +226,9 @@ class AudioProcessor:
                         generated_audio, original_text, self.target_sample_rate
                     )
                 )
+
+                if similarity < -10:
+                    original_text = re.sub(r"^[^，]*", "", original_text)
 
                 logger.info(f"""
 ==================
@@ -249,11 +260,6 @@ class AudioProcessor:
                         )
 
                         audio_fragments.append(prepared_audio)
-                        audio_fragments.append(
-                            self.generate_silence(
-                                original_text, self.target_sample_rate
-                            )
-                        )
                         break
                 else:
                     # 处理生成的音频
@@ -269,9 +275,6 @@ class AudioProcessor:
                         self.save_audio(speaker, prepared_audio, original_text)
 
                     audio_fragments.append(prepared_audio)
-                    audio_fragments.append(
-                        self.generate_silence(original_text, self.target_sample_rate)
-                    )
                     break
 
         return audio_fragments
@@ -363,20 +366,15 @@ class AudioProcessor:
             torchaudio.save(output_path, combined_audio, self.target_sample_rate)
             logger.info(f"章节 {chapter_index} 的音频文件已保存到 {output_path}")
 
-            # 记录处理日志
-            process_log_path = f"./tmp/{book_name}/process.txt"
-            with open(process_log_path, "w", encoding="utf-8") as process_log:
-                process_log.write(f"{chapter_index}")
-            logger.info(f"已记录章节 {chapter_index} 的处理进度。")
-
         except Exception as e:
             logger.exception(f"处理章节 {chapter_index} 时发生异常：{e}")
 
     def run(self):
         """
         运行音频处理任务。
+        status：等待中，执行中，已完成
         """
-        task_list = self.load_task_list()
+        task_list = self.task_list
 
         if not task_list:
             logger.info("任务列表为空，等待新任务。")
@@ -384,37 +382,33 @@ class AudioProcessor:
 
         for task in task_list:
             book_name = task.get("book_name")
-            status = task.get("status", "等待中")
+            check_spk_status = task.get("check_spk_status", "等待中")
 
-            if status == "已完成":
-                logger.info(f"书籍 {book_name} 已完成，跳过。")
+            if check_spk_status != "已完成":
+                logger.info(
+                    f"跳过处理书籍 '{book_name}'，当前状态为 '{check_spk_status}'。"
+                )
                 continue
 
-            # 更新任务状态为 '执行中'
-            task["status"] = "执行中"
+            gen_tts_status = task.get("gen_tts_status", "等待中")
+
+            if gen_tts_status == "已完成":
+                logger.info(f"跳过处理书籍 '{book_name}'，当前状态为 '已完成'。")
+                continue
+
+            gen_tts_start_idx = task.get("gen_tts_start_idx", 1)
             self.default_spk = task.get("default_spk", "旁白1")
-            self.save_task_list(task_list)
+
+            # 更新任务状态为 '执行中'
+            task["gen_tts_status"] = "执行中"
+            task["default_spk"] = self.default_spk
             self.current_book_name = book_name
 
             # 记录处理日志路径
-            process_log_path = f"./tmp/{book_name}/process.txt"
-            # 确保书籍处理目录存在
-            os.makedirs(os.path.dirname(process_log_path), exist_ok=True)
             os.makedirs(f"./tmp/{book_name}/gen", exist_ok=True)
             data_dir = f"./tmp/{book_name}/data"
 
-            # 读取开始的章节索引，如果日志文件存在
-            if os.path.exists(process_log_path):
-                with open(process_log_path, "r", encoding="utf-8") as process_log:
-                    last_processed_chapter = process_log.read().strip()
-                    if last_processed_chapter.isdigit():
-                        start_chapter_idx = int(last_processed_chapter) + 1
-                    else:
-                        start_chapter_idx = 1
-            else:
-                start_chapter_idx = 1
-
-            logger.info(f"开始处理书籍：{book_name}，从章节 {start_chapter_idx} 开始。")
+            logger.info(f"开始处理书籍：{book_name}，从章节 {gen_tts_start_idx} 开始。")
 
             # 获取所有章节文件，按章节编号排序
             try:
@@ -430,23 +424,26 @@ class AudioProcessor:
                 )
             except Exception as e:
                 logger.error(f"获取书籍 {book_name} 的章节文件时发生错误：{e}")
-                task["status"] = "failed"
+                task["gen_tts_status"] = "失败"
                 self.save_task_list(task_list)
                 continue
 
             total_chapters = len(chapter_files)
+            task["gen_tts_end_idx"] = total_chapters
+            self.save_task_list(task_list)
 
-            if start_chapter_idx > total_chapters:
+            if gen_tts_start_idx > total_chapters:
                 logger.info(f"书籍 {book_name} 所有章节已处理完毕。")
-                task["status"] = "已完成"
+                task["gen_tts_status"] = "已完成"
                 self.save_task_list(task_list)
                 continue
 
-            for chapter_idx in range(start_chapter_idx, total_chapters + 1):
+            for chapter_idx in range(gen_tts_start_idx, total_chapters + 1):
                 self.process_chapter(book_name, chapter_idx)
+                task["gen_tts_start_idx"] = chapter_idx + 1
+                self.save_task_list(task_list)
 
-            # 更新任务状态为 '已完成' after all chapters are processed
-            task["status"] = "已完成"
+            task["gen_tts_status"] = "已完成"
             self.save_task_list(task_list)
             logger.info(f"书籍 {book_name} 的所有章节已处理完毕。")
 

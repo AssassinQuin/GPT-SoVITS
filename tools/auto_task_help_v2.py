@@ -136,7 +136,7 @@ def split_non_quote_text(text: str, max_length: int = 30) -> List[str]:
 
         # 优先在 end 前向窗口查找标点
         split_pos = -1
-        window = 5  # 查找窗口大小，可根据需要调整
+        window = 30  # 查找窗口大小，可根据需要调整
 
         for i in range(end - 1, max(start, end - window) - 1, -1):
             if text[i] in "。？！～，;；，":
@@ -160,76 +160,6 @@ def split_non_quote_text(text: str, max_length: int = 30) -> List[str]:
         start = split_pos
 
     return result
-
-
-# def split_text(text: str, max_length: int = 30) -> List[str]:
-#     """
-#     根据中文标点符号和最大长度将文本分割成多个块。
-
-#     Args:
-#         text (str): 输入文本。
-#         max_length (int, optional): 每块的最大长度。默认为30。
-
-#     Returns:
-#         List[str]: 分割后的文本块。
-#     """
-#     chunks = []
-#     curr_text = []
-#     last_punct_idx = -1
-
-#     for idx, ch in enumerate(text):
-#         if ch == "“":
-#             if curr_text:
-#                 tmp_text = "".join(curr_text)
-#                 tmp_text = tmp_text.lstrip("。？！，")  # 移除开头的标点
-#                 if tmp_text:
-#                     chunks.append(tmp_text)
-#                 curr_text = []
-#             tmp_quote = [ch]
-#             while idx < len(text) and text[idx] != "”":
-#                 tmp_quote.append(text[idx])
-#                 idx += 1
-#             if idx < len(text):
-#                 tmp_quote.append("”")
-#                 chunks.append("".join(tmp_quote))
-#             continue
-
-#         if ch in "。？！～，":
-#             last_punct_idx = len(curr_text)
-#         curr_text.append(ch)
-
-#         if len(curr_text) > max_length:
-#             if last_punct_idx != -1:
-#                 cut_point = last_punct_idx + 1
-#                 tmp_text = "".join(curr_text[:cut_point]).lstrip("。？！～，")
-#                 if tmp_text:
-#                     chunks.append(tmp_text)
-#                 curr_text = curr_text[cut_point:]
-#                 last_punct_idx = -1
-#             else:
-#                 # 强制切割到下一个标点符号
-#                 for future_idx in range(idx + 1, len(text)):
-#                     if text[future_idx] in "。？！～，":
-#                         tmp_text = "".join(curr_text) + text[idx + 1 : future_idx + 1]
-#                         tmp_text = tmp_text.lstrip("。？！～，")
-#                         if tmp_text:
-#                             chunks.append(tmp_text)
-#                         curr_text = []
-#                         idx = future_idx
-#                         break
-#                 else:
-#                     # 如果未找到标点，强制切割
-#                     tmp_text = "".join(curr_text[:max_length]).lstrip("。？！～，")
-#                     if tmp_text:
-#                         chunks.append(tmp_text)
-#                     curr_text = curr_text[max_length:]
-
-#     if curr_text:
-#         tmp_text = "".join(curr_text).lstrip("。？！～，")
-#         if tmp_text:
-#             chunks.append(tmp_text)
-
-#     return chunks
 
 
 def get_texts(text: str, ignore_punctuation: bool = False) -> List[str]:
@@ -321,13 +251,25 @@ def _has_omission(gen_text: str, text: str) -> Tuple[bool, float, str, str]:
     def get_pinyin_str(text: str) -> str:
         return " ".join(word[0] for word in pinyin(text, style=Style.TONE2))
 
-    def get_pinyin_list(text: str) -> List[str]:
-        pinyins = []
-        for ch in text:
-            pinyin_list = pinyin(ch, heteronym=True, style=Style.FIRST_LETTER)
-            if pinyin_list:
-                pinyins.append(pinyin_list[0])
-        return [item for sublist in pinyins for item in sublist]
+    def has_pinyin_intersection(str1, str2):
+        # 将字符串转换为拼音，处理多音字
+        pinyin_list1 = [
+            item[0]
+            for sublist in pinyin(hans=str1, heteronym=True, style=Style.TONE2)
+            for item in sublist
+        ]
+        pinyin_list2 = [
+            item[0]
+            for sublist in pinyin(hans=str2, heteronym=True, style=Style.TONE2)
+            for item in sublist
+        ]
+
+        # 将拼音列表转换为集合
+        pinyin_set1 = set(pinyin_list1)
+        pinyin_set2 = set(pinyin_list2)
+
+        # 检查拼音集合是否有交集
+        return bool(pinyin_set1 & pinyin_set2)
 
     def calculate_similarity(pinyin1: str, pinyin2: str) -> float:
         return SequenceMatcher(None, pinyin1, pinyin2).ratio()
@@ -341,30 +283,33 @@ def _has_omission(gen_text: str, text: str) -> Tuple[bool, float, str, str]:
     gen_pinyin_str = get_pinyin_str(gen_text_clean)
     text_pinyin_str = get_pinyin_str(text_clean)
 
-    gen_pinyin_list = get_pinyin_list(gen_text_clean)
-    text_pinyin_list = get_pinyin_list(text_clean)
+    weight = 100 / len(text_clean) / 2
 
     sim_ratio = calculate_similarity(gen_pinyin_str, text_pinyin_str) * 100
 
-    if "儿" in text:
-        sim_ratio += 5
-
-    has_omission_flag = True
+    needs_repeat = True
     if len(gen_text_clean) != len(text_clean):
         length_diff = abs(len(gen_text_clean) - len(text_clean))
-        sim_ratio -= length_diff * 5
-        has_omission_flag = sim_ratio < 98
+        sim_ratio -= length_diff * weight
+        needs_repeat = sim_ratio < max(1 - weight * 2, 95)
     else:
         mismatch = False
-        for gen_p, text_p in zip(gen_pinyin_list, text_pinyin_list):
-            if gen_p not in text_p:
-                sim_ratio -= 5
-                mismatch = True
+        sim_ratio = 100.0
+        for idx in range(len(text_clean)):
+            if text_clean[idx] == gen_text_clean[idx]:
+                continue
+            else:
+                # 若 text_clean[idx] 与 gen_text_clean[idx] 没有交集
+                if not has_pinyin_intersection(text_clean[idx], gen_text_clean[idx]):
+                    sim_ratio -= weight
+                    mismatch = True
+
         if not mismatch:
             sim_ratio = 100
-        has_omission_flag = sim_ratio < 98
+        print(max(1 - weight * 2, 95))
+        needs_repeat = sim_ratio < max(1 - weight * 2, 95)
 
-    return has_omission_flag, sim_ratio, gen_text_clean, text_clean
+    return needs_repeat, sim_ratio, gen_text_clean, text_clean
 
 
 def clear_text(text: str, ignore_punctuation: bool = False) -> str:
@@ -387,16 +332,13 @@ def clear_text(text: str, ignore_punctuation: bool = False) -> str:
 
 if __name__ == "__main__":
     text = """
-第1章 唯一的号码        
-黎簇从沙漠里出来，身体一直没有完全恢复，还在接受持续治疗。他的神志完全清醒，已是他在北京医院醒来的第三天，他第一次完全想起了所有的事情。
-背后的伤口奇迹般的成功结痂了，轻微的瘙痒让他很不舒服，这种感觉让一切细节开始回到他的脑子里。他想起了那只手机。那个黑瞎子，在给了他食物和水之后，和他说过，他必须活下去，他需要拨打一个电话，来告诉电话另一头的人所有事情的经过。
-黎簇不敢说他是真正的刚刚想起来。经历了太阳下的暴晒，他所有的精力都用在了走路上。他有无数次回忆时就要想起这些细节，但是脑海中那刺目的毒日让他的记忆一想到沙漠就自动停止了。
-即便他现在想起来，也没有马上拨打这个电话。他忽然想到，自己已经走出了这件事情，如果他不去回忆，这一切都会过去。唯独他背后的伤疤在时刻提醒他这些已经发生的事情。当时吴邪说过，带他去沙漠就是因为他背后的伤疤。
-如果他拨打了这个电话，电话另一头的人决定去沙漠中救吴邪和黑瞎子的话，他们是不是也会来找他？ 如果他背后的伤疤真像吴邪认为的那么重要的话，电话另一头的人，肯定也会来找他。那么，事情还会再重复发生一遍。
-不，他无法在经历一次了躺在床上，他身上所有的肌肉都麻木了。这棉质被子的质感，空调吹出的风所散发出的臭味和适宜的温度，还有四周人说话的声音，让他忽然意识到了文明的美好。
-不能就这么简单的打这个电话。
-"""
+我之所以想离开家，是因为我哥一直都没有音讯，所以我想出去找到他，可是想要离开家的话，至少要到二十岁，所以我必须通过特殊手段才能得到提前离开的机会，所以我靠近了他！
+        """
     texts = get_texts(text)
 
     for text_line in texts:
         print(text_line)
+# gen_text = "小猿你没事吧"
+# target_text = "小媛你没事吧"
+# b, f, g, t = _has_omission(gen_text, target_text)
+# print(b, f, g, t)

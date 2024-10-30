@@ -22,16 +22,13 @@ import LangSegment, os, re, sys, json
 import pdb
 import torch
 
-<<<<<<< HEAD
 try:
     import gradio.analytics as analytics
-    analytics.version_check = lambda:None
-except:...
 
-version=os.environ.get("version","v2")
-pretrained_sovits_name=["GPT_SoVITS/pretrained_models/gsv-v2final-pretrained/s2G2333k.pth", "GPT_SoVITS/pretrained_models/s2G488k.pth"]
-pretrained_gpt_name=["GPT_SoVITS/pretrained_models/gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt", "GPT_SoVITS/pretrained_models/s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt"]
-=======
+    analytics.version_check = lambda: None
+except:
+    ...
+
 version = os.environ.get("version", "v2")
 pretrained_sovits_name = [
     "GPT_SoVITS/pretrained_models/gsv-v2final-pretrained/s2G2333k.pth",
@@ -41,7 +38,6 @@ pretrained_gpt_name = [
     "GPT_SoVITS/pretrained_models/gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt",
     "GPT_SoVITS/pretrained_models/s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt",
 ]
->>>>>>> c211b85 (duoren v3)
 
 _ = [[], []]
 for i in range(2):
@@ -354,13 +350,9 @@ def get_first(text):
 
 
 from text import chinese
-<<<<<<< HEAD
-def get_phones_and_bert(text,language,version,final=False):
-=======
 
 
-def get_phones_and_bert(text, language, version):
->>>>>>> c211b85 (duoren v3)
+def get_phones_and_bert(text, language, version, final=False):
     if language in {"en", "all_zh", "all_ja", "all_ko", "all_yue"}:
         language = language.replace("all_", "")
         if language == "en":
@@ -429,14 +421,10 @@ def get_phones_and_bert(text, language, version):
         phones = sum(phones_list, [])
         norm_text = "".join(norm_text_list)
 
-<<<<<<< HEAD
     if not final and len(phones) < 6:
-        return get_phones_and_bert("." + text,language,version,final=True)
+        return get_phones_and_bert("." + text, language, version, final=True)
 
-    return phones,bert.to(dtype),norm_text
-=======
     return phones, bert.to(dtype), norm_text
->>>>>>> c211b85 (duoren v3)
 
 
 def merge_short_text_in_array(texts, threshold):
@@ -459,11 +447,6 @@ def merge_short_text_in_array(texts, threshold):
 
 ##ref_wav_path+prompt_text+prompt_language+text(单个)+text_language+top_k+top_p+temperature
 # cache_tokens={}#暂未实现清理机制
-<<<<<<< HEAD
-cache= {}
-def get_tts_wav(ref_wav_path, prompt_text, prompt_language, text, text_language, how_to_cut=i18n("不切"), top_k=20, top_p=0.6, temperature=0.6, ref_free 
-    =False,speed=1,if_freeze=False,inp_refs=None):
-=======
 cache = {}
 
 
@@ -480,9 +463,8 @@ def get_tts_wav(
     ref_free=False,
     speed=1,
     if_freeze=False,
-    inp_refs=123,
+    inp_refs=None,
 ):
->>>>>>> c211b85 (duoren v3)
     global cache
     if ref_wav_path:
         pass
@@ -505,14 +487,8 @@ def get_tts_wav(
             prompt_text += "。" if prompt_language != "en" else "."
         print(i18n("实际输入的参考文本:"), prompt_text)
     text = text.strip("\n")
-<<<<<<< HEAD
     # if (text[0] not in splits and len(get_first(text)) < 4): text = "。" + text if text_language != "en" else "." + text
-    
-=======
-    if text[0] not in splits and len(get_first(text)) < 4:
-        text = "。" + text if text_language != "en" else "." + text
 
->>>>>>> c211b85 (duoren v3)
     print(i18n("实际输入的目标文本:"), text)
     zero_wav = np.zeros(
         int(hps.data.sampling_rate * 0.3),
@@ -819,25 +795,6 @@ with gr.Blocks(title="GPT-SoVITS WebUI") as app:
     with gr.Group():
         gr.Markdown(html_center(i18n("模型切换"), "h3"))
         with gr.Row():
-<<<<<<< HEAD
-            GPT_dropdown = gr.Dropdown(label=i18n("GPT模型列表"), choices=sorted(GPT_names, key=custom_sort_key), value=gpt_path, interactive=True, scale=14)
-            SoVITS_dropdown = gr.Dropdown(label=i18n("SoVITS模型列表"), choices=sorted(SoVITS_names, key=custom_sort_key), value=sovits_path, interactive=True, scale=14)
-            refresh_button = gr.Button(i18n("刷新模型路径"), variant="primary", scale=14)
-            refresh_button.click(fn=change_choices, inputs=[], outputs=[SoVITS_dropdown, GPT_dropdown])
-        gr.Markdown(html_center(i18n("*请上传并填写参考信息"),'h3'))
-        with gr.Row():
-            inp_ref = gr.Audio(label=i18n("请上传3~10秒内参考音频，超过会报错！"), type="filepath", scale=13)
-            with gr.Column(scale=13):
-                ref_text_free = gr.Checkbox(label=i18n("开启无参考文本模式。不填参考文本亦相当于开启。"), value=False, interactive=True, show_label=True,scale=1)
-                gr.Markdown(html_left(i18n("使用无参考文本模式时建议使用微调的GPT，听不清参考音频说的啥(不晓得写啥)可以开。<br>开启后无视填写的参考文本。")))
-                prompt_text = gr.Textbox(label=i18n("参考音频的文本"), value="", lines=5, max_lines=5,scale=1)
-            with gr.Column(scale=14):
-                prompt_language = gr.Dropdown(
-                    label=i18n("参考音频的语种"), choices=list(dict_language.keys()), value=i18n("中文"),
-                )
-                inp_refs = gr.File(label=i18n("可选项：通过拖拽多个文件上传多个参考音频（建议同性），平均融合他们的音色。如不填写此项，音色由左侧单个参考音频控制。如是微调模型，建议参考音频全部在微调训练集音色内，底模不用管。"),file_count="multiple")
-        gr.Markdown(html_center(i18n("*请填写需要合成的目标文本和语种模式"),'h3'))
-=======
             GPT_dropdown = gr.Dropdown(
                 label=i18n("GPT模型列表"),
                 choices=sorted(GPT_names, key=custom_sort_key),
@@ -871,6 +828,7 @@ with gr.Blocks(title="GPT-SoVITS WebUI") as app:
                     value=False,
                     interactive=True,
                     show_label=True,
+                    scale=1,
                 )
                 gr.Markdown(
                     html_left(
@@ -880,23 +838,25 @@ with gr.Blocks(title="GPT-SoVITS WebUI") as app:
                     )
                 )
                 prompt_text = gr.Textbox(
-                    label=i18n("参考音频的文本"), value="", lines=3, max_lines=3
+                    label=i18n("参考音频的文本"),
+                    value="",
+                    lines=5,
+                    max_lines=5,
+                    scale=1,
                 )
-            prompt_language = gr.Dropdown(
-                label=i18n("参考音频的语种"),
-                choices=list(dict_language.keys()),
-                value=i18n("中文"),
-                scale=14,
-            )
-            inp_refs = gr.File(
-                label=i18n(
-                    "可选项：通过拖拽多个文件上传多个参考音频（建议同性），平均融合他们的音色。如不填写此项，音色由左侧单个参考音频控制。如是微调模型，建议参考音频全部在微调训练集音色内，底模不用管。"
-                ),
-                file_count="file_count",
-                scale=13,
-            )
+            with gr.Column(scale=14):
+                prompt_language = gr.Dropdown(
+                    label=i18n("参考音频的语种"),
+                    choices=list(dict_language.keys()),
+                    value=i18n("中文"),
+                )
+                inp_refs = gr.File(
+                    label=i18n(
+                        "可选项：通过拖拽多个文件上传多个参考音频（建议同性），平均融合他们的音色。如不填写此项，音色由左侧单个参考音频控制。如是微调模型，建议参考音频全部在微调训练集音色内，底模不用管。"
+                    ),
+                    file_count="multiple",
+                )
         gr.Markdown(html_center(i18n("*请填写需要合成的目标文本和语种模式"), "h3"))
->>>>>>> c211b85 (duoren v3)
         with gr.Row():
             with gr.Column(scale=13):
                 text = gr.Textbox(
@@ -1031,13 +991,8 @@ with gr.Blocks(title="GPT-SoVITS WebUI") as app:
         #     button5.click(cut5, [text_inp], [text_opt])
         # gr.Markdown(html_center(i18n("后续将支持转音素、手工修改音素、语音合成分步执行。")))
 
-<<<<<<< HEAD
-if __name__ == '__main__':
-    app.queue().launch(#concurrency_count=511, max_size=1022
-=======
 if __name__ == "__main__":
-    app.queue(concurrency_count=511, max_size=1022).launch(
->>>>>>> c211b85 (duoren v3)
+    app.queue().launch(  # concurrency_count=511, max_size=1022
         server_name="0.0.0.0",
         inbrowser=True,
         share=is_share,

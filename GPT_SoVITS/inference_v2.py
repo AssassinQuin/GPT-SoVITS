@@ -21,7 +21,6 @@ from GPT_SoVITS.inference_help import (
     i18n,
     dict_language,
     splits,
-    get_first,
     DictToAttrRecursive,
     cut3,
     process_text,
@@ -127,41 +126,17 @@ class TTSGenerator:
         """
         with torch.no_grad():
             inputs = self.tokenizer(text, return_tensors="pt")
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
-            outputs = self.bert_model(**inputs, output_hidden_states=True)
-            hidden_states = outputs.hidden_states[-3:-2]  # 根据实际需求调整
-            hidden_states_combined = torch.cat(hidden_states, dim=-1)[0].cpu()[
-                1:-1
-            ]  # 去除特殊标记
-
-        assert len(word2ph) == len(text), "音素数量与文本长度不匹配"
-
-        # 添加日志以检查 hidden_states_combined 的形状和 phoneme_counts
-        logger.debug(f"hidden_states_combined.shape: {hidden_states_combined.shape}")
-        logger.debug(f"phoneme_counts: {word2ph}")
-
-        try:
-            phone_level_features = [
-                hidden_states_combined[i].unsqueeze(0).repeat(word2ph[i], 1)
-                for i in range(len(word2ph))
-            ]
-        except Exception as e:
-            logger.error(f"Error in repeating hidden states: {e}")
-            logger.error(
-                f"hidden_states_combined.shape: {hidden_states_combined.shape}"
-            )
-            logger.error(f"phoneme_counts: {word2ph}")
-            raise
-
-        if phone_level_features:  # Ensure phone_level_features is not empty
-            phone_level_features = torch.cat(phone_level_features, dim=0)
-        else:
-            phone_level_features = torch.empty(
-                (0, hidden_states_combined.size(-1)), device=self.device
-            )
-
-        # 转置以匹配后续模型输入
-        return phone_level_features.T
+            for i in inputs:
+                inputs[i] = inputs[i].to(self.device)
+            res = self.bert_model(**inputs, output_hidden_states=True)
+            res = torch.cat(res["hidden_states"][-3:-2], -1)[0].cpu()[1:-1]
+        assert len(word2ph) == len(text)
+        phone_level_feature = []
+        for i in range(len(word2ph)):
+            repeat_feature = res[i].repeat(word2ph[i], 1)
+            phone_level_feature.append(repeat_feature)
+        phone_level_feature = torch.cat(phone_level_feature, dim=0)
+        return phone_level_feature.T
 
     def clean_text_inf(self, text, language, version):
         phones, word2ph, norm_text = clean_text(text, language, version)
@@ -179,7 +154,7 @@ class TTSGenerator:
             ).to(self.device)
         return bert
 
-    def get_phones_and_bert(self, text, language, version):
+    def get_phones_and_bert(self, text, language, version, final=False):
         if language in {"en", "all_zh", "all_ja", "all_ko", "all_yue"}:
             language = language.replace("all_", "")
             if language == "en":
@@ -252,6 +227,8 @@ class TTSGenerator:
             bert = torch.cat(bert_list, dim=1)
             phones = sum(phones_list, [])
             norm_text = "".join(norm_text_list)
+        if not final and len(phones) < 6:
+            return self.get_phones_and_bert("." + text, language, version, final=True)
 
         return phones, bert.to(self.dtype), norm_text
 
@@ -291,9 +268,7 @@ class TTSGenerator:
         else:
             self.vq_model = self.vq_model.to(self.device)
         self.vq_model.eval()
-        logger.info(
-            f"加载 Sovits 模型权重: {self.vq_model.load_state_dict(dict_s2['weight'], strict=False)}"
-        )
+        self.vq_model.load_state_dict(dict_s2["weight"])
 
         # 更新语言设置
         if prompt_language is not None and text_language is not None:
@@ -349,9 +324,9 @@ class TTSGenerator:
         role_name,
         text,
         text_language="中英混合",
-        top_k=15,
-        top_p=1,
-        temperature=1,
+        top_k=20,
+        top_p=0.6,
+        temperature=0.6,
         ref_free=False,
         speed=1,
         if_freeze=False,
@@ -414,13 +389,13 @@ class TTSGenerator:
         prompt_language,
         text,
         text_language,
-        top_k=15,
-        top_p=1,
-        temperature=1,
+        top_k=20,
+        top_p=0.6,
+        temperature=0.6,
         ref_free=False,
         speed=1,
         if_freeze=False,
-        inp_refs=123,
+        inp_refs=None,
     ):
         """
         生成 TTS 音频。
@@ -452,8 +427,6 @@ class TTSGenerator:
             if prompt_text[-1] not in splits:
                 prompt_text += "。" if prompt_language != "en" else "."
         text = text.strip("\n")
-        if text[0] not in splits and len(get_first(text)) < 4:
-            text = "。" + text if text_language != "en" else "." + text
 
         zero_wav = np.zeros(
             int(self.hps.data.sampling_rate * 0.3),

@@ -21,9 +21,12 @@ from GPT_SoVITS.inference_help import (
     i18n,
     dict_language,
     splits,
-    get_first,
     DictToAttrRecursive,
+    cut1,
+    cut2,
     cut3,
+    cut4,
+    cut5,
     process_text,
     merge_short_text_in_array,
 )
@@ -102,10 +105,7 @@ def get_bert_feature(text, word2ph):
     for i in range(len(word2ph)):
         repeat_feature = res[i].repeat(word2ph[i], 1)
         phone_level_feature.append(repeat_feature)
-    if phone_level_feature:  # Ensure phone_level_feature is not empty
-        phone_level_feature = torch.cat(phone_level_feature, dim=0)
-    else:
-        phone_level_feature = torch.tensor([], device=device)  # Create an empty tensor
+    phone_level_feature = torch.cat(phone_level_feature, dim=0)
     return phone_level_feature.T
 
 
@@ -128,7 +128,7 @@ def get_bert_inf(phones, word2ph, norm_text, language):
     return bert
 
 
-def get_phones_and_bert(text, language, version):
+def get_phones_and_bert(text, language, version, final=False):
     if language in {"en", "all_zh", "all_ja", "all_ko", "all_yue"}:
         language = language.replace("all_", "")
         if language == "en":
@@ -181,8 +181,6 @@ def get_phones_and_bert(text, language, version):
                     # 因无法区别中日韩文汉字,以用户输入为准
                     langlist.append(language)
                 textlist.append(tmp["text"])
-        # logger.info(textlist)
-        # logger.info(langlist)
         phones_list = []
         bert_list = []
         norm_text_list = []
@@ -196,6 +194,9 @@ def get_phones_and_bert(text, language, version):
         bert = torch.cat(bert_list, dim=1)
         phones = sum(phones_list, [])
         norm_text = "".join(norm_text_list)
+
+    if not final and len(phones) < 6:
+        return get_phones_and_bert("." + text, language, version, final=True)
 
     return phones, bert.to(dtype), norm_text
 
@@ -211,7 +212,6 @@ def change_sovits_weights(sovits_path, prompt_language=None, text_language=None)
     else:
         hps.model.version = "v2"
     version = hps.model.version
-    logger.info("sovits版本:", hps.model.version)
     vq_model = SynthesizerTrn(
         hps.data.filter_length // 2 + 1,
         hps.train.segment_size // hps.data.hop_length,
@@ -225,7 +225,7 @@ def change_sovits_weights(sovits_path, prompt_language=None, text_language=None)
     else:
         vq_model = vq_model.to(device)
     vq_model.eval()
-    logger.info(vq_model.load_state_dict(dict_s2["weight"], strict=False))
+    vq_model.load_state_dict(dict_s2["weight"])
 
     if prompt_language is not None and text_language is not None:
         if prompt_language in list(dict_language.keys()):
@@ -274,9 +274,9 @@ def inference(
     role_name,
     text,
     text_language="中英混合",
-    top_k=15,
-    top_p=1,
-    temperature=1,
+    top_k=20,
+    top_p=0.6,
+    temperature=0.6,
     ref_free=False,
     speed=1,
     if_freeze=False,
@@ -303,6 +303,7 @@ spk：{cache_role_info}
         "中文",
         text,
         text_language,
+        i18n("按标点符号切"),
         top_k,
         top_p,
         temperature,
@@ -321,16 +322,16 @@ def get_tts_wav(
     prompt_language,
     text,
     text_language,
-    top_k=15,
-    top_p=1,
-    temperature=1,
+    how_to_cut=i18n("按标点符号切"),
+    top_k=20,
+    top_p=0.6,
+    temperature=0.6,
     ref_free=False,
     speed=1,
     if_freeze=False,
-    inp_refs=123,
+    inp_refs=None,
 ):
     global cache
-
     if prompt_text is None or len(prompt_text) == 0:
         ref_free = True
     prompt_language = dict_language[prompt_language]
@@ -341,8 +342,6 @@ def get_tts_wav(
         if prompt_text[-1] not in splits:
             prompt_text += "。" if prompt_language != "en" else "."
     text = text.strip("\n")
-    if text[0] not in splits and len(get_first(text)) < 4:
-        text = "。" + text if text_language != "en" else "." + text
 
     zero_wav = np.zeros(
         int(hps.data.sampling_rate * 0.3),
@@ -369,7 +368,16 @@ def get_tts_wav(
             prompt_semantic = codes[0, 0]
             prompt = prompt_semantic.unsqueeze(0).to(device)
 
-    text = cut3(text)
+    if how_to_cut == i18n("凑四句一切"):
+        text = cut1(text)
+    elif how_to_cut == i18n("凑50字一切"):
+        text = cut2(text)
+    elif how_to_cut == i18n("按中文句号。切"):
+        text = cut3(text)
+    elif how_to_cut == i18n("按英文句号.切"):
+        text = cut4(text)
+    elif how_to_cut == i18n("按标点符号切"):
+        text = cut5(text)
     while "\n\n" in text:
         text = text.replace("\n\n", "\n")
     texts = text.split("\n")
