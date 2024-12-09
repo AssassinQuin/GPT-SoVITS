@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+from datetime import datetime
 import os
 import traceback
 import uuid
@@ -20,12 +21,16 @@ def only_asr(input_audio, rate=22050):
                 input_audio = input_audio.squeeze(0)
 
             # 将 tensor 保存为临时 wav 文件
-            tmp_name = str(uuid.uuid4())
-            temp_wav_path = f"./tmp/gen_temp/{tmp_name}.wav"
+            # 生成时间戳
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+
+            # 生成四位的 UUID 字符串
+            uuid_str = str(uuid.uuid4())[:4]
+            temp_wav_path = f"./tmp/gen_temp/{timestamp}_{uuid_str}.wav"
             sf.write(temp_wav_path, input_audio, rate)
 
             # 使用临时文件进行推理
-            text = model.generate(input=temp_wav_path)[0]["text"]
+            text = model.generate(input=temp_wav_path, language="auto")[0]["text"]
             os.remove(temp_wav_path)
     except:
         text = ""

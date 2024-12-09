@@ -22,7 +22,7 @@ from GPT_SoVITS.inference_help import (
     dict_language,
     splits,
     DictToAttrRecursive,
-    cut3,
+    cut5,
     process_text,
     merge_short_text_in_array,
 )
@@ -323,7 +323,7 @@ class TTSGenerator:
         self,
         role_name,
         text,
-        text_language="中英混合",
+        text_language="多语种混合",
         top_k=20,
         top_p=0.6,
         temperature=0.6,
@@ -352,6 +352,9 @@ class TTSGenerator:
         """
         if self.cache_role_info == "" or self.cache_role_info != role_name:
             role_info = self.role_map.get(role_name, {})
+            if role_info == {}:
+                logger.info(f"角色 {role_name} 不存在，使用默认角色")
+                role_info = self.role_map.get("旁白1")
             self.role_info = role_info
             self.change_gpt_weights(role_info.get("gpt_model", ""))
             self.change_sovits_weights(role_info.get("sovits_model", ""))
@@ -362,6 +365,7 @@ class TTSGenerator:
     spk：{self.cache_role_info}
     速度：{speed}
     文本：{text}
+    语言：{text_language}
     =====================
     """)
 
@@ -397,26 +401,6 @@ class TTSGenerator:
         if_freeze=False,
         inp_refs=None,
     ):
-        """
-        生成 TTS 音频。
-
-        Args:
-            ref_wav_path (str): 参考音频路径。
-            prompt_text (str): 提示文本。
-            prompt_language (str): 提示语言。
-            text (str): 输入文本。
-            text_language (str): 文本语言。
-            top_k (int, optional): top_k 超参数。默认为 15。
-            top_p (float, optional): top_p 超参数。默认为 1。
-            temperature (float, optional): 温度参数。默认为 1。
-            ref_free (bool, optional): 是否不使用参考音频。默认为 False。
-            speed (float, optional): 语速。默认为 1。
-            if_freeze (bool, optional): 是否冻结缓存。默认为 False。
-            inp_refs (Optional[Generator], optional): 输入参考音频。默认为 123。
-
-        Yields:
-            Tuple[int, np.ndarray]: 采样率和生成的音频数组。
-        """
         if prompt_text is None or len(prompt_text) == 0:
             ref_free = True
         prompt_language = dict_language[prompt_language]
@@ -453,7 +437,7 @@ class TTSGenerator:
                 prompt_semantic = codes[0, 0]
                 prompt = prompt_semantic.unsqueeze(0).to(self.device)
 
-        text = cut3(text)
+        text = cut5(text)
         while "\n\n" in text:
             text = text.replace("\n\n", "\n")
         texts = text.split("\n")
@@ -466,7 +450,6 @@ class TTSGenerator:
             )
 
         for i_text, text in enumerate(texts):
-            # 解决输入目标文本的空行导致报错的问题
             if len(text.strip()) == 0:
                 continue
             if text[-1] not in splits:
@@ -500,6 +483,12 @@ class TTSGenerator:
                         temperature=temperature,
                         early_stop_num=self.hz * self.max_sec,
                     )
+                    if idx > 1400:
+                        # If idx == 1499, yield only 0.2 seconds of silence
+                        silence_duration = int(0.2 * self.hps.data.sampling_rate)
+                        silence_audio = np.zeros(silence_duration, dtype=np.int16)
+                        yield (self.hps.data.sampling_rate, silence_audio)
+                        return  # Exit the function early
                     pred_semantic = pred_semantic[:, -idx:].unsqueeze(0)
                     self.cache[i_text] = pred_semantic
 
@@ -533,11 +522,12 @@ class TTSGenerator:
                 .cpu()
                 .numpy()[0, 0]
             )
-            max_audio = np.abs(audio).max()  # 简单防止16bit爆音
+            max_audio = np.abs(audio).max()
             if max_audio > 1:
                 audio /= max_audio
             audio_opt.append(audio)
             audio_opt.append(zero_wav)
+
         yield (
             self.hps.data.sampling_rate,
             (np.concatenate(audio_opt, 0) * 32768).astype(np.int16),
@@ -550,13 +540,12 @@ if __name__ == "__main__":
         rate, wav_array = tts_generator.inference(
             "旁白1",
             """
-第1章 南京储物柜     
-=============================
-故事情节接
-先说一件有趣的事情。
-田有金是一个做冬虫夏草生意的药商，和我的上一辈来往密切，属于小时候抱过我这个类别的叔叔。
-上世纪70年代末，田有金在内蒙山区有过一段插队的经历，他最津津乐道的是自己和大牧队走散，在草原上徘徊了两个月，带着羊群躲过山狼最终得救的故事。
-        """,
+DEATH NOTE——洛杉矶BB连续杀人事件
+
+HOW TO USE IT
+当彼永德巴斯蒂杀害第三个人的时候，他做了一个实验。那就是尝试在不破坏内脏的情况下，能否让被害人因内出血致死。具体的做法是，把因为药物失去意识的被害人捆绑起来，让其动弹不得，然后在不损伤皮肤的情况下，持续彻底殴打对方的左腕——也就是说，他企图通过左腕的失血过量杀人。可惜，这个实验最终以失败告终了。虽然被害人的左腕因为淤血全部变成紫黑色，但是他并没有因此死亡。被害人只是出现了奇怪的痉挛反应，完全没有生命之忧。虽然他从书本上看到过，人若失去一只手臂分量的血液生命就会停止，但是这似乎并不属实。本身杀人的方法对于彼永德巴斯蒂来说并不是最重要的，这只是余兴，只是一个实验而矣，成功也好失败也罢，对他来说根本无所谓。彼永德巴斯蒂轻轻耸了耸肩，然后抽出了刀子——不。
+不，不，不。
+""",
         )
         sf.write("output.wav", wav_array, rate)
     except Exception as e:

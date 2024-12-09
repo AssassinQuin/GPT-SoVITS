@@ -556,13 +556,13 @@ def train_1Bb(model_list):
     # def open1Bb
     for name in model_list:
         print(f"GPT训练：{name}")
-        batch = 2
-        epoch = 40
+        batch = 1
+        epoch = 12
         exp_name = name
         dpo = False
         save_latest = True
         save_every_weights = True
-        save_every_epoch = 40
+        save_every_epoch = 12
         gpu_numbers = "0"
         pretrained_s1 = "GPT_SoVITS/pretrained_models/gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt"
         for status in open1Bb(
@@ -586,12 +586,12 @@ def train_1Bb(model_list):
 def train_1Ba(model_list):
     for name in model_list:
         batch_size = 2
-        total_epoch = 24
+        total_epoch = 8
         exp_name = name
         text_low_lr_rate = 0.4
         if_save_latest = True
         if_save_every_weights = True
-        save_every_epoch = 24
+        save_every_epoch = 8
         gpu_numbers1Ba = "0"
         pretrained_s2G = (
             "GPT_SoVITS/pretrained_models/gsv-v2final-pretrained/s2G2333k.pth"

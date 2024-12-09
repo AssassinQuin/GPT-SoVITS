@@ -1,7 +1,7 @@
 ﻿import os
 import json
-import random
 import argparse
+from itertools import cycle
 
 
 def generate_role(role_json_path):
@@ -35,46 +35,93 @@ def generate_role(role_json_path):
     for role_category, role_list in data.items():
         if isinstance(role_list, list):
             for role in role_list:
-                role_name = role["name"]
-                role_path = role["path"]
+                role_name = role.get("name", "")
+                role_path = role.get("path", "")
+                role_age = role.get("age", "")
                 try:
                     role_map[role_name] = get_files(role_path)
                     role_map[role_name]["role"] = role_category
+                    role_map[role_name]["age"] = role_age
                 except FileNotFoundError as e:
                     print(f"Error processing {role_name}: {e}")
         else:
-            role_name = role_list["name"]
-            role_path = role_list["path"]
+            role_name = role_list.get("name", "")
+            role_path = role_list.get("path", "")
+            role_age = role.get("age", "")
+
             try:
                 role_map[role_name] = get_files(role_path)
                 role_map[role_name]["role"] = role_category
+                role_map[role_name]["age"] = role_age
+
             except FileNotFoundError as e:
                 print(f"Error processing {role_name}: {e}")
-
-    # 保存到一个新的JSON文件
-    with open("role_map.json", "w", encoding="utf-8") as f:
-        json.dump(role_map, f, ensure_ascii=False, indent=4)
 
     return role_map
 
 
-def select_role_by_gender(gender, role_map):
+def select_role_by_gender_and_age(gender, age, role_map, role_cyclers):
     if gender == "女":
-        female_roles = [key for key, role in role_map.items() if role["role"] == "女配"]
+        if age == "未知":
+            age = "青年"
+        female_roles = [
+            key
+            for key, role in role_map.items()
+            if role["role"] == "女配" and role["age"] == age
+        ]
+        if len(female_roles) == 0:
+            female_roles = [
+                key for key, role in role_map.items() if role["role"] == "女配"
+            ]
         if female_roles:
-            return random.choice(female_roles)
+            if "female" not in role_cyclers:
+                role_cyclers["female"] = cycle(female_roles)
+            return next(role_cyclers["female"])
         else:
             print("No female roles available.")
     else:
-        male_roles = [key for key, role in role_map.items() if role["role"] == "男配"]
+        if age == "未知":
+            age = "青年"
+        male_roles = [
+            key
+            for key, role in role_map.items()
+            if role["role"] == "男配" and role["age"] == age
+        ]
+        if len(male_roles) == 0:
+            male_roles = [
+                key for key, role in role_map.items() if role["role"] == "男配"
+            ]
         if male_roles:
-            return random.choice(male_roles)
+            if "male" not in role_cyclers:
+                role_cyclers["male"] = cycle(male_roles)
+            return next(role_cyclers["male"])
         else:
             print("No male roles available.")
 
 
 def main(base_directory, book_name):
     role_json_path = os.path.join(base_directory, f"model/role_{book_name}.json")
+
+    # 检查 role_json_path 是否存在
+    if not os.path.exists(role_json_path):
+        # 定义模板 JSON 文件的路径
+        template_json_path = os.path.join(base_directory, "model/role.json")
+
+        # 检查模板 JSON 文件是否存在
+        if os.path.exists(template_json_path):
+            # 读取模板 JSON 文件
+            with open(template_json_path, "r", encoding="utf-8-sig") as template_file:
+                template_data = json.load(template_file)
+
+            # 生成新的 JSON 文件
+            with open(role_json_path, "w", encoding="utf-8") as new_file:
+                json.dump(template_data, new_file, ensure_ascii=False, indent=4)
+            print(f"Generated {role_json_path} from {template_json_path}")
+        else:
+            print(f"Template file {template_json_path} does not exist.")
+    else:
+        print(f"{role_json_path} already exists.")
+
     role_map = generate_role(role_json_path)
 
     role_mapping_path = os.path.join(
@@ -95,8 +142,6 @@ def main(base_directory, book_name):
         with open(role_mapping_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-    print(data)
-
     # 读取 book_name 目录下所有 chapter_{idx}.json 文件，按照 idx 升序排列
     role_directory_path = os.path.join(base_directory, f"tmp/{book_name}/role")
 
@@ -113,6 +158,9 @@ def main(base_directory, book_name):
     # 按照 idx 升序排序
     files.sort(key=lambda x: int(x.split("_")[1].split(".")[0]))
 
+    # 初始化角色轮询器
+    role_cyclers = {}
+
     # 读取所有文件内容并存储在列表中
     for file in files:
         file_path = os.path.join(role_directory_path, file)
@@ -122,8 +170,11 @@ def main(base_directory, book_name):
                 for item in content:
                     for key, value in item.items():
                         if data.get(value.get("role", "")) is None:
-                            role_name = select_role_by_gender(
-                                value.get("gender", "男"), role_map
+                            role_name = select_role_by_gender_and_age(
+                                value.get("gender", "男"),
+                                value.get("age", "青年"),
+                                role_map,
+                                role_cyclers,
                             )
                             data[value["role"]] = role_name
 
@@ -134,7 +185,12 @@ def main(base_directory, book_name):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Role generation script.")
-    parser.add_argument("book_name", type=str, help="Name of the book.")
+    parser.add_argument(
+        "book_name",
+        type=str,
+        help="Name of the book.",
+        default="深海余烬",
+    )
     parser.add_argument(
         "--base_directory",
         type=str,

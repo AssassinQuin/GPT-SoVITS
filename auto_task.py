@@ -200,7 +200,8 @@ class AudioProcessor:
             List[torch.Tensor]: 更新后的音频片段列表。
         """
         parsed_texts = get_texts(text_line, ignore_punctuation=True)
-        for text in parsed_texts:
+        for text_info in parsed_texts:
+            (text, lang) = text_info
             try_count = 0
             original_text = text
             cleaned_text = clear_text(text, ignore_punctuation=True)
@@ -211,38 +212,46 @@ class AudioProcessor:
             while True:
                 if original_text == "":
                     break
+
                 # 调用 TTS 推理函数
                 returned_sr, generated_audio = self.model.inference(
-                    speaker, original_text
+                    speaker, original_text, lang
                 )
                 self.target_sample_rate = returned_sr
 
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
 
+                # 确保 generated_audio 是 PyTorch 张量
+                if isinstance(generated_audio, np.ndarray):
+                    generated_audio = torch.from_numpy(generated_audio)
+
+                # 将生成的音频转换为 NumPy 数组
+                generated_audio_np = generated_audio.squeeze().cpu().numpy()
+
                 # 检查是否有遗漏
                 needs_repeat, similarity, clean_generated_text, clean_input_text = (
                     has_omission(
-                        generated_audio, original_text, self.target_sample_rate
+                        generated_audio_np,
+                        original_text,
+                        self.target_sample_rate,
+                        lang,
                     )
                 )
 
-                if similarity < -10:
-                    original_text = re.sub(r"^[^，]*", "", original_text)
-
                 logger.info(f"""
-==================
-原始文本: {original_text}
-尝试次数: {try_count}
-说话人: {speaker}
-生成文本: {clean_generated_text}
-输入文本: {clean_input_text}
-相似度: {similarity}
-==================
+    ==================
+    原始文本: {original_text}
+    尝试次数: {try_count}
+    说话人: {speaker}
+    生成文本: {clean_generated_text}
+    输入文本: {clean_input_text}
+    相似度: {similarity}
+    ==================
                 """)
 
                 # 记录相似度与音频映射
-                self.pinyin_similarity_map[similarity] = generated_audio
+                self.pinyin_similarity_map[similarity] = generated_audio_np
 
                 if needs_repeat:
                     try_count += 1
@@ -265,7 +274,7 @@ class AudioProcessor:
                     # 处理生成的音频
                     self.pinyin_similarity_map.clear()
                     try_count = 0
-                    generated_tensor = torch.from_numpy(generated_audio).unsqueeze(0)
+                    generated_tensor = torch.from_numpy(generated_audio_np).unsqueeze(0)
                     prepared_audio = self.prepare_audio(
                         generated_tensor, self.target_sample_rate
                     )
@@ -333,14 +342,13 @@ class AudioProcessor:
                 unit="行",
                 leave=True,
             ) as progress_bar:
-                for line in progress_bar:
+                for line_info in progress_bar:
+                    (line, _) = line_info
                     cleaned_line = clear_text(line, ignore_punctuation=True)
 
                     # 获取角色对应的说话人
                     book_role = chapter_map.get(cleaned_line, {}).get("role", "")
                     speaker = bookname_to_role.get(book_role, self.default_spk)
-                    if speaker != "旁白1":
-                        print("speaker")
 
                     # 处理文本行并生成音频
                     audio_fragments = self.process_text_line(

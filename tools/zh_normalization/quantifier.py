@@ -17,7 +17,7 @@ from .num import num2str
 
 # 温度表达式，温度会影响负号的读法
 # -3°C 零下三度
-RE_TEMPERATURE = re.compile(r'(-?)(\d+(\.\d+)?)(°C|℃|度|摄氏度)')
+RE_TEMPERATURE = re.compile(r"(-?)(\d+(\.\d+)?)(°C|℃|度|摄氏度)")
 measure_dict = {
     "cm2": "平方厘米",
     "cm²": "平方厘米",
@@ -33,9 +33,9 @@ measure_dict = {
     "m³": "立方米",
     "m3": "立方米",
     "ml": "毫升",
-    "m": "米",
+    # "m": "米",
     "mm": "毫米",
-    "s": "秒"
+    # "s": "秒"
 }
 
 

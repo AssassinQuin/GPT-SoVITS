@@ -4,6 +4,7 @@ import re
 import shutil
 import cn2an
 import logging
+from chardet import detect
 from auto_task_help import format_text_v2
 
 logging.basicConfig(level=logging.INFO)
@@ -17,10 +18,16 @@ def read_novel(novel_name):
     """
     novel_path = f"tmp/{novel_name}/{novel_name}.txt"
     try:
-        with open(novel_path, "r", encoding="utf-8") as file:
-            content = file.read()
+        with open(novel_path, "rb") as file:
+            raw_data = file.read()
+            result = detect(raw_data)
+            encoding = result['encoding']
+            content = raw_data.decode(encoding)
     except FileNotFoundError:
         logging.error(f"File not found: {novel_path}")
+        return None
+    except UnicodeDecodeError:
+        logging.error(f"Failed to decode file with detected encoding: {encoding}")
         return None
 
     # 简单清洗文本

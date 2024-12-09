@@ -67,7 +67,7 @@ class TextNormalizer:
         """
         # Only for pure Chinese here
         if lang == "zh":
-            text = text.replace(" ", "")
+            # text = text.replace(" ", "")
             # 过滤掉特殊字符
             # text = re.sub(r"[——《》【】<>{}()（）#&@“”^_|\\]", "", text)
             text = re.sub(r"[——《》【】<>{}()（）#&@^_|\\]", "", text)

@@ -2,21 +2,16 @@
 import re
 import requests
 import json
-import logging
 from tqdm import tqdm
 from tools.auto_task_help_v2 import clear_text
 from typing import Dict, Any, Optional, List
+from loguru import logger
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
 
 # 常量
 API_URL = "http://localhost:11434/api/generate"
-# MODEL_NAME = "wangshenzhi/gemma2-9b-chinese-chat"
-MODEL_NAME = "granite3-dense:8b"
+MODEL_NAME = "wangshenzhi/gemma2-9b-chinese-chat"
+# MODEL_NAME = "granite3-dense:8b"
 
 CHECK_SPK_LIST_PATH = "tmp/task_list.json"  # 默认的check_spk_list.json路径
 
@@ -100,7 +95,7 @@ def construct_prompt(sentence: str, context: str, top_roles: str) -> str:
 1.1 分析句子【{sentence}】及其在上下文中的位置，推断说出该句子的角色。**请勿直接使用句子中的任何角色名称。**
 
 1.2 如果无法确定具体角色或句子没有特定角色，请返回以下 JSON 格式：
-{{"role": "未知", "gender": "未知"}}
+{{"role": "未知", "gender": "未知","age":"未知"}}
 
 ### 步骤 2：角色匹配
 2.1 从给定的角色列表中【{top_roles}】查找与步骤 1 中推断的角色名称相似的角色名。
@@ -111,11 +106,18 @@ def construct_prompt(sentence: str, context: str, top_roles: str) -> str:
 3.1 根据上下文对角色的描述，推断该角色的性别。性别结果必须为 "男"、"女" 或 "未知"。
 
 3.2 如果无法从上下文中推断出性别，请返回以下 JSON 格式：
-{{"role": "角色姓名", "gender": "未知"}}
+{{"role": "角色姓名", "gender": "未知","age":"未知"}}
 
-### 步骤 4：输出格式
+### 步骤 4：判断年龄
+4.1 根据上下文对角色的描述，推断该角色的年龄。性别结果必须为 青年，中年。
+
+4.2 如果无法从上下文中推断出性别，请返回以下 JSON 格式：
+{{"role": "角色姓名", "gender": "未知","age":"未知"}}
+
+
+### 步骤 5：输出格式
 无论结果如何，输出都必须严格按照以下 JSON 格式返回：
-{{"role": "角色姓名", "gender": "男/女/未知"}}
+{{"role": "角色姓名", "gender": "男/女/未知"，"age":"青年/中年/未知"}}
 
 ### 注意事项：
 - 请确保每一步都清晰、明确，避免任何模糊或歧义。
@@ -148,20 +150,21 @@ def construct_check_prompt(
 1.1 判断句子是否由角色【{first_role_name}】说出。
 
 1.2 如果是，请确认并返回以下 JSON 格式：
-{{"role": "{first_role_name}", "gender": "{{相应性别}}" }}
+{{"role": "{first_role_name}", "gender": "{{相应性别}}","age": "{{相应年龄}} }}
 
 1.3 如果不是，请从角色列表中【{top_roles}】重新判断句子的说话角色。
 
 ### 步骤 2：重新识别
 2.1 如果重新识别出新的角色，请返回以下 JSON 格式：
-{{"role": "新角色名称", "gender": "{{相应性别}}" }}
+2.2 年龄分为： 青年，中年。
+{{"role": "新角色名称", "gender": "{{相应性别}}", "age": "{{相应年龄}}" }}
 
 2.2 如果依然无法确定，请返回以下 JSON 格式：
-{{"role": "未知", "gender": "未知"}}
+{{"role": "未知", "gender": "未知", "age": "未知" }}
 
 ### 步骤 3：输出格式
 无论结果如何，输出都必须严格按照以下 JSON 格式返回：
-{{"role": "角色姓名", "gender": "男/女/未知"}}
+{{"role": "角色姓名", "gender": "男/女/未知", "age": "年龄" }}
 
 ### 注意事项：
 - 确保所有输出为有效的 JSON 格式。
@@ -186,10 +189,10 @@ def construct_comprehensive_prompt(
 【{sentence}】
 
 【第一判断角色】：
-{{"role": "{first_role['role']}", "gender": "{first_role['gender']}" }}
+{{"role": "{first_role['role']}", "gender": "{first_role['gender']}", "age": "{first_role['age']}" }}
 
 【第二判断角色】：
-{{"role": "{second_role['role']}", "gender": "{second_role['gender']}" }}
+{{"role": "{second_role['role']}", "gender": "{second_role['gender']}", "age": "{second_role['age']}" }}
 
 【角色列表】：
 {top_roles}
@@ -207,9 +210,15 @@ def construct_comprehensive_prompt(
 
 2.2 如果无法从上下文中推断出性别，请返回 "未知"。
 
-### 步骤 3：输出格式
+### 步骤 3：判断年龄
+3.1 根据上下文对角色的描述，推断该角色的年龄。性别结果必须为 青年，中年。
+
+3.2 如果无法从上下文中推断出性别，请返回以下 JSON 格式：
+{{"role": "角色姓名", "gender": "未知","age":"未知"}}
+
+### 步骤 4：输出格式
 无论结果如何，输出都必须严格按照以下 JSON 格式返回：
-{{"role": "最终角色姓名", "gender": "男/女/未知"}}
+{{"role": "最终角色姓名", "gender": "男/女/未知", "age":"青年/中年/未知"}}
 
 ### 注意事项：
 - 所有输出必须为有效的 JSON 格式。
@@ -219,60 +228,62 @@ def construct_comprehensive_prompt(
 
 
 def process_sentence(
-    sentence: str, context: str, top_roles: str
+    sentence: str, context1: str, context2: str, context3: str, top_roles: str
 ) -> Dict[str, Dict[str, str]]:
     """处理单个句子，识别角色和性别，采用三层思维逻辑。"""
     result = {}
     try:
         # 第一层思维：初步识别
-        prompt1 = construct_prompt(sentence, context, top_roles)
+        prompt1 = construct_prompt(sentence, context1, top_roles)
         response1 = post_request_with_retries(prompt1)
         if not response1:
             return result
         first_role_name = response1.get("role", "未知")
         first_gender = response1.get("gender", "未知")
+        first_age = response1.get("age", "未知")
 
         # 第二层思维：验证与扩展
         check_prompt = construct_check_prompt(
-            context, sentence, first_role_name, top_roles
+            context2, sentence, first_role_name, top_roles
         )
         response2 = post_request_with_retries(check_prompt)
         if not response2:
             return result
         second_role_name = response2.get("role", "未知")
         second_gender = response2.get("gender", "未知")
-
-        # 初始化中间结果
-        intermediate_role = first_role_name
-        intermediate_gender = first_gender
+        second_age = response2.get("age", "未知")
 
         # 如果第一层和第二层结果不一致，进行第三层思维
         if first_role_name != second_role_name:
             # 第三层思维：综合判断
             comprehensive_prompt = construct_comprehensive_prompt(
-                context,
+                context3,
                 sentence,
-                {"role": first_role_name, "gender": first_gender},
-                {"role": second_role_name, "gender": second_gender},
+                {"role": first_role_name, "gender": first_gender, "age": first_age},
+                {"role": second_role_name, "gender": second_gender, "age": second_age},
                 top_roles,
             )
             response3 = post_request_with_retries(comprehensive_prompt)
             if response3:
                 final_role = response3.get("role", "未知")
                 final_gender = response3.get("gender", "未知")
+                final_age = response3.get("age", "未知")
             else:
                 final_role = "未知"
                 final_gender = "未知"
+                final_age = "未知"
         else:
             # 如果一致，直接使用第一层结果
             final_role = first_role_name
             final_gender = first_gender
+            final_age = first_age
 
         # 填充最终结果
         result[clear_text(sentence, True)] = {
             "role": final_role,
             "gender": final_gender,
-            "content": context,
+            "age": final_age,
+            "content": context1,
         }
 
     except Exception as e:
@@ -328,13 +339,23 @@ def process_file(
             sentence = sentence.strip()
             if not sentence:
                 continue
-            context = "".join(
-                lines[max(0, idx - 7) : idx]
-                + [line]
-                + lines[idx + 1 : min(len(lines), idx + 8)]
+            context1 = "".join(
+                "".join(lines[max(0, idx - 50) : idx])[-120:]
+                + line
+                + "".join(lines[idx + 1 : min(len(lines), idx + 50)])[:120]
+            )
+            context2 = "".join(
+                "".join(lines[max(0, idx - 50) : idx])[-220:]
+                + line
+                + "".join(lines[idx + 1 : min(len(lines), idx + 50)])[:220]
+            )
+            context3 = "".join(
+                "".join(lines[max(0, idx - 50) : idx])[-300:]
+                + line
+                + "".join(lines[idx + 1 : min(len(lines), idx + 50)])[:300]
             )
             top_roles = get_top_roles(book_data, current_chapter, top_n)
-            result = process_sentence(sentence, context, top_roles)
+            result = process_sentence(sentence, context1, context2, context3, top_roles)
             if result:
                 results.append(result)
                 # 更新书籍数据
@@ -456,6 +477,7 @@ def update_status(
 
 
 def main():
+    global BOOK_NAME
     # 读取check_spk_list.json
     if not os.path.exists(CHECK_SPK_LIST_PATH):
         logger.error(f"check_spk_list.json文件不存在: {CHECK_SPK_LIST_PATH}")
