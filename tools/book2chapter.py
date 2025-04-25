@@ -21,7 +21,7 @@ def read_novel(novel_name):
         with open(novel_path, "rb") as file:
             raw_data = file.read()
             result = detect(raw_data)
-            encoding = result['encoding']
+            encoding = result["encoding"]
             content = raw_data.decode(encoding)
     except FileNotFoundError:
         logging.error(f"File not found: {novel_path}")

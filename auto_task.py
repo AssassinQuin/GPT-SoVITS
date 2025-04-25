@@ -186,15 +186,22 @@ class AudioProcessor:
         return default
 
     def process_text_line(
-        self, text_line: str, audio_fragments: List[torch.Tensor], speaker: str
+        self,
+        text_line: str,
+        audio_fragments: List[torch.Tensor],
+        speaker: str,
+        subtitle_lines: List[str],
+        current_time: float,
     ) -> List[torch.Tensor]:
         """
-        处理单行文本，包括生成音频、处理相似度等。
+        处理单行文本，包括生成音频、处理相似度等，并生成字幕。
 
         Args:
             text_line (str): 原始文本行。
             audio_fragments (List[torch.Tensor]): 音频片段列表，用于拼接最终音频。
             speaker (str): 说话人名称。
+            subtitle_lines (List[str]): 字幕行列表。
+            current_time (float): 当前时间，单位为秒，用于计算字幕的时间戳。
 
         Returns:
             List[torch.Tensor]: 更新后的音频片段列表。
@@ -269,6 +276,23 @@ class AudioProcessor:
                         )
 
                         audio_fragments.append(prepared_audio)
+
+                        # 获取最后一个片段的时长
+                        fragment_duration = (
+                            prepared_audio.size(0) / self.target_sample_rate
+                        )  # 修复这一行，使用 size(0) 处理一维或二维张量
+                        start_time = current_time
+                        end_time = current_time + fragment_duration
+
+                        # 将字幕信息添加到字幕列表
+                        subtitle_lines.append(
+                            f"{len(subtitle_lines) + 1}\n"
+                            f"{self.format_time(start_time)} --> {self.format_time(end_time)}\n"
+                            f"{self.insert_line_breaks(original_text)}\n\n"
+                        )
+
+                        # 更新当前时间
+                        current_time = end_time
                         break
                 else:
                     # 处理生成的音频
@@ -284,13 +308,89 @@ class AudioProcessor:
                         self.save_audio(speaker, prepared_audio, original_text)
 
                     audio_fragments.append(prepared_audio)
+
+                    # 获取最后一个片段的时长
+                    fragment_duration = (
+                        prepared_audio.size(0) / self.target_sample_rate
+                    )  # 修复这一行，使用 size(0) 处理一维或二维张量
+                    start_time = current_time
+                    end_time = current_time + fragment_duration
+
+                    # 将字幕信息添加到字幕列表
+                    subtitle_lines.append(
+                        f"{len(subtitle_lines) + 1}\n"
+                        f"{self.format_time(start_time)} --> {self.format_time(end_time)}\n"
+                        f"{self.insert_line_breaks(original_text)}\n\n"
+                    )
+
+                    # 更新当前时间
+                    current_time = end_time
+
                     break
 
-        return audio_fragments
+        return audio_fragments, subtitle_lines, current_time
+
+    def insert_line_breaks(self, text: str) -> str:
+        """
+        在标点符号后插入换行符，并且每10个字符进行换行，
+        若当前第11个字符为标点符号，则保留该标点符号在当前行。
+
+        Args:
+            text (str): 原始文本。
+
+        Returns:
+            str: 处理后的文本。
+        """
+        max_chars = 10  # 每行最大字符数
+        # 定义需要换行的标点符号
+        punctuations = ["，", "。", "；", "！", "？", "：", "、"]
+
+        result = []
+        temp_line = ""
+        count = 0
+
+        i = 0
+        while i < len(text):
+            char = text[i]
+            temp_line += char
+            count += 1
+
+            # 如果字符数量达到最大字符数，检查下一个字符是否为标点
+            if count == max_chars:
+                if i + 1 < len(text) and text[i + 1] in punctuations:
+                    # 如果下一个字符是标点符号，保留在当前行
+                    temp_line += text[i + 1]
+                    result.append(temp_line)
+                    temp_line = ""
+                    count = 0
+                    i += 2  # 跳过标点符号
+                    continue
+                else:
+                    # 其他情况，强制换行
+                    result.append(temp_line)
+                    temp_line = ""
+                    count = 0
+
+            # 如果当前字符是标点符号且不满10个字符，则在标点符号后换行
+            elif char in punctuations and count < max_chars:
+                # 不在行尾插入换行符，只有在文本后面时才插入
+                if i + 1 < len(text):
+                    result.append(temp_line)
+                    temp_line = ""
+                    count = 0
+
+            i += 1
+
+        # 将剩余部分加入结果
+        if temp_line:
+            result.append(temp_line)
+
+        # 拼接所有行，并去除多余的空白行
+        return "\n".join(result).strip()
 
     def process_chapter(self, book_name: str, chapter_index: int) -> None:
         """
-        处理指定章节的文本文件，生成对应的音频文件。
+        处理指定章节的文本文件，生成对应的音频文件，并创建字幕文件。
 
         Args:
             book_name (str): 书名。
@@ -330,7 +430,9 @@ class AudioProcessor:
             )
 
             audio_fragments: List[torch.Tensor] = []
+            subtitle_lines: List[str] = []
             total_texts = len(texts)
+            current_time = 0.0  # 当前时间（秒）
 
             logger.info(
                 f"开始处理书籍：{book_name}，章节 {chapter_index}: {chapter_title}，总文本数：{total_texts}"
@@ -342,7 +444,7 @@ class AudioProcessor:
                 unit="行",
                 leave=True,
             ) as progress_bar:
-                for line_info in progress_bar:
+                for idx, line_info in enumerate(progress_bar, start=1):
                     (line, _) = line_info
                     cleaned_line = clear_text(line, ignore_punctuation=True)
 
@@ -350,9 +452,11 @@ class AudioProcessor:
                     book_role = chapter_map.get(cleaned_line, {}).get("role", "")
                     speaker = bookname_to_role.get(book_role, self.default_spk)
 
-                    # 处理文本行并生成音频
-                    audio_fragments = self.process_text_line(
-                        line, audio_fragments, speaker
+                    # 处理文本行并生成音频，更新字幕
+                    audio_fragments, subtitle_lines, current_time = (
+                        self.process_text_line(
+                            line, audio_fragments, speaker, subtitle_lines, current_time
+                        )
                     )
 
             # 拼接所有音频片段
@@ -368,14 +472,43 @@ class AudioProcessor:
 
             # 保存最终音频文件
             formatted_chapter_index = f"{chapter_index:02d}"
-            output_path = os.path.join(
+            output_audio_path = os.path.join(
                 f"./tmp/{book_name}/gen", f"{book_name}_{formatted_chapter_index}.wav"
             )
-            torchaudio.save(output_path, combined_audio, self.target_sample_rate)
-            logger.info(f"章节 {chapter_index} 的音频文件已保存到 {output_path}")
+            torchaudio.save(output_audio_path, combined_audio, self.target_sample_rate)
+            logger.info(f"章节 {chapter_index} 的音频文件已保存到 {output_audio_path}")
+
+            # 保存字幕文件
+            output_subtitle_path = os.path.join(
+                f"./tmp/{book_name}/gen", f"{book_name}_{formatted_chapter_index}.srt"
+            )
+            with open(output_subtitle_path, "w", encoding="utf-8") as subtitle_file:
+                subtitle_file.writelines(subtitle_lines)
+            logger.info(
+                f"章节 {chapter_index} 的字幕文件已保存到 {output_subtitle_path}"
+            )
 
         except Exception as e:
             logger.exception(f"处理章节 {chapter_index} 时发生异常：{e}")
+
+    @staticmethod
+    def format_time(seconds: float) -> str:
+        """
+        格式化时间为 SRT 的时间格式。
+
+        Args:
+            seconds (float): 秒数。
+
+        Returns:
+            str: 格式化后的时间字符串。
+        """
+        millis = int((seconds % 1) * 1000)
+        seconds = int(seconds)
+        minutes = seconds // 60
+        hours = minutes // 60
+        seconds = seconds % 60
+        minutes = minutes % 60
+        return f"{hours:02}:{minutes:02}:{seconds:02},{millis:03}"
 
     def run(self):
         """

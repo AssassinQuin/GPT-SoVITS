@@ -1,16 +1,43 @@
 ﻿#!/bin/bash
 
-if pgrep -f "auto_task*" > /dev/null
-then
-    pgrep -f "auto_task*" | xargs kill -9
-    echo "运行 auto_task.py，正在杀掉进程"
-else
-    echo "未运行 auto_task.py"
+# 检查是否有参数传入
+if [ -z "$1" ]; then
+    echo "请输入参数："
+    echo "  a (auto_task) - 运行 auto_task.py"
+    echo "  c (check_spk) - 运行 check_spk.py"
+    echo "  e (stop)      - 停止所有相关进程"
+    exit 1
 fi
 
-# 在后台运行新的脚本实例，并将输出重定向到 out.log
-# nohup /root/miniconda3/envs/GPTSoVits/bin/python auto_task_v2.py 藏海花 28 70 > out.log 2>&1 &
-# nohup /root/miniconda3/envs/GPTSoVits/bin/python auto_task_v2.py --book_name 我在精神病院学斩神-三九音域 --start_idx 829 --end_idx 900 > out.log 2>&1 &
-# nohup /root/miniconda3/envs/GPTSoVits/bin/python auto_task_v3.py  诡秘之主  301  400 > out.log 2>&1 &
+# 根据参数选择操作
+if [[ $1 == "c" ]]; then
+    SCRIPT="tools/check_spk.py"
+    echo "运行 check_spk.py"
+elif [[ $1 == "a" ]]; then
+    SCRIPT="auto_task.py"
+    echo "运行 auto_task.py"
+elif [[ $1 == "e" ]]; then
+    echo "停止所有相关进程..."
+    # 杀掉所有相关的 Python 进程
+    pkill -f "auto_task.py"
+    pkill -f "tools/check_spk.py"
+    echo "已停止所有相关进程"
+    exit 0
+else
+    echo "无效参数，请输入以下参数之一："
+    echo "  a (auto_task) - 运行 auto_task.py"
+    echo "  c (check_spk) - 运行 check_spk.py"
+    echo "  e (stop)      - 停止所有相关进程"
+    exit 1
+fi
 
-nohup /root/miniconda3/envs/GPTSoVits/bin/python auto_task.py > out.log 2>&1 &
+# 检查是否有同名进程在运行
+if pgrep -f "$SCRIPT" > /dev/null; then
+    pgrep -f "$SCRIPT" | xargs kill -9
+    echo "发现 $SCRIPT 正在运行，杀掉进程"
+else
+    echo "未运行 $SCRIPT"
+fi
+
+# 启动新的进程
+nohup /root/miniconda3/envs/GPTSoVits/bin/python "$SCRIPT" > out.log 2>&1 &

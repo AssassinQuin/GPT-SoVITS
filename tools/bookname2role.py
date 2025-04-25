@@ -2,6 +2,7 @@
 import json
 import argparse
 from itertools import cycle
+from collections import defaultdict
 
 
 def generate_role(role_json_path):
@@ -61,18 +62,21 @@ def generate_role(role_json_path):
 
 
 def select_role_by_gender_and_age(gender, age, role_map, role_cyclers):
+    # 根据性别和年龄选择角色
     if gender == "女":
-        if age == "未知":
-            age = "青年"
-        female_roles = [
-            key
-            for key, role in role_map.items()
-            if role["role"] == "女配" and role["age"] == age
-        ]
-        if len(female_roles) == 0:
+        # 如果年龄已知，优先选择对应年龄的角色
+        if age != "未知":
+            female_roles = [
+                key
+                for key, role in role_map.items()
+                if role["role"] == "女配" and role["age"] == age
+            ]
+        else:
+            # 如果年龄未知，使用全年龄段的角色
             female_roles = [
                 key for key, role in role_map.items() if role["role"] == "女配"
             ]
+
         if female_roles:
             if "female" not in role_cyclers:
                 role_cyclers["female"] = cycle(female_roles)
@@ -80,17 +84,19 @@ def select_role_by_gender_and_age(gender, age, role_map, role_cyclers):
         else:
             print("No female roles available.")
     else:
-        if age == "未知":
-            age = "青年"
-        male_roles = [
-            key
-            for key, role in role_map.items()
-            if role["role"] == "男配" and role["age"] == age
-        ]
-        if len(male_roles) == 0:
+        # 如果年龄已知，优先选择对应年龄的角色
+        if age != "未知":
+            male_roles = [
+                key
+                for key, role in role_map.items()
+                if role["role"] == "男配" and role["age"] == age
+            ]
+        else:
+            # 如果年龄未知，使用全年龄段的角色
             male_roles = [
                 key for key, role in role_map.items() if role["role"] == "男配"
             ]
+
         if male_roles:
             if "male" not in role_cyclers:
                 role_cyclers["male"] = cycle(male_roles)
@@ -161,6 +167,11 @@ def main(base_directory, book_name):
     # 初始化角色轮询器
     role_cyclers = {}
 
+    # 初始化临时的角色统计信息
+    role_stats = defaultdict(
+        lambda: {"gender": {"男": 0, "女": 0}, "age": {"中年": 0, "青年": 0}}
+    )
+
     # 读取所有文件内容并存储在列表中
     for file in files:
         file_path = os.path.join(role_directory_path, file)
@@ -169,14 +180,37 @@ def main(base_directory, book_name):
             if isinstance(content, list):
                 for item in content:
                     for key, value in item.items():
-                        if data.get(value.get("role", "")) is None:
-                            role_name = select_role_by_gender_and_age(
-                                value.get("gender", "男"),
-                                value.get("age", "青年"),
-                                role_map,
-                                role_cyclers,
-                            )
-                            data[value["role"]] = role_name
+                        role = value.get("role", "")
+                        gender = value.get("gender", "未知")
+                        age = value.get("age", "未知")
+
+                        # 更新角色统计信息
+                        if gender in role_stats[role]["gender"]:
+                            role_stats[role]["gender"][gender] += 1
+                        if age in role_stats[role]["age"]:
+                            role_stats[role]["age"][age] += 1
+
+    # 根据统计信息选择角色
+    for role, stats in role_stats.items():
+        gender_counts = stats["gender"]
+        age_counts = stats["age"]
+
+        # 选择出现次数最多的 gender
+        gender = max(gender_counts, key=gender_counts.get) if gender_counts else "未知"
+        # 选择出现次数最多的 age
+        age = max(age_counts, key=age_counts.get) if age_counts else "未知"
+
+        # 如果 gender 或 age 的统计结果相同，使用第一次出现的值
+        if list(gender_counts.values()).count(gender_counts[gender]) > 1:
+            gender = "男" if "男" in gender_counts else "女"
+        if list(age_counts.values()).count(age_counts[age]) > 1:
+            age = "中年" if "中年" in age_counts else "青年"
+
+        # 选择角色
+        role_name = select_role_by_gender_and_age(
+            gender, "未知", role_map, role_cyclers
+        )
+        data[role] = role_name
 
     # 将数据写入文件
     with open(role_mapping_path, "w", encoding="utf-8") as f:
@@ -189,7 +223,7 @@ if __name__ == "__main__":
         "book_name",
         type=str,
         help="Name of the book.",
-        default="深海余烬",
+        default="无限恐怖",
     )
     parser.add_argument(
         "--base_directory",

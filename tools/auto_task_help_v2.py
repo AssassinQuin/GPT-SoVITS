@@ -227,6 +227,8 @@ def classify_text(text: str) -> str:
     has_other_language = False
 
     for char in cleaned_text:
+        if char.isdigit():
+            continue  # 忽略数字
         if is_chinese(char):
             has_chinese = True
         elif is_english(char):
@@ -440,6 +442,9 @@ if __name__ == "__main__":
 “啊，我班上的学生接二连三地出问题呢。”
 莲实开口说道。
 
+迈络思于1999年在以色列设立，在美国纳斯达克证券交易所上市，主要从事网络互联产品的研发、生产和销售。英伟达于1998年在美国设立，在美国纳斯达克证券交易所上市，主要从事图形处理器的研发、生产和销售。
+
+北京时间12月9日晚间，英伟达盘前下跌2.20%，股价报139.31美元/股。
         """
     texts = get_texts(text)
 

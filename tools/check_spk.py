@@ -10,8 +10,8 @@ from loguru import logger
 
 # 常量
 API_URL = "http://localhost:11434/api/generate"
-MODEL_NAME = "wangshenzhi/gemma2-9b-chinese-chat"
-# MODEL_NAME = "granite3-dense:8b"
+# MODEL_NAME = "wangshenzhi/gemma2-9b-chinese-chat"
+MODEL_NAME = "granite3.1-dense"
 
 CHECK_SPK_LIST_PATH = "tmp/task_list.json"  # 默认的check_spk_list.json路径
 
@@ -189,10 +189,10 @@ def construct_comprehensive_prompt(
 【{sentence}】
 
 【第一判断角色】：
-{{"role": "{first_role['role']}", "gender": "{first_role['gender']}", "age": "{first_role['age']}" }}
+{{"role": "{first_role["role"]}", "gender": "{first_role["gender"]}", "age": "{first_role["age"]}" }}
 
 【第二判断角色】：
-{{"role": "{second_role['role']}", "gender": "{second_role['gender']}", "age": "{second_role['age']}" }}
+{{"role": "{second_role["role"]}", "gender": "{second_role["gender"]}", "age": "{second_role["age"]}" }}
 
 【角色列表】：
 {top_roles}
