@@ -1,0 +1,233 @@
+{
+    "阿贝多": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/阿贝多/但只要认真观察研究同是来自异世界的，你说不定就能让我找到上种子发芽的灵感。.wav",
+        "ref_text": "但只要认真观察研究同是来自异世界的，你说不定就能让我找到上种子发芽的灵感。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/阿贝多/阿贝多-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/阿贝多/阿贝多_e16_s8848.pth",
+        "role": "女配"
+    },
+    "布洛妮娅": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/布洛妮娅/审讯恶徒时时常要强压心中怒火，以免用词有事妥当。.wav",
+        "ref_text": "审讯恶徒时时常要强压心中怒火，以免用词有事妥当。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/布洛妮娅/布洛妮娅-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/布洛妮娅/布洛妮娅_e16_s5200.pth",
+        "role": "女配"
+    },
+    "黑天鹅": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/黑天鹅/很高兴你的精神状态还算正常，没有受到那片原始梦境的影响。运气不错。.wav",
+        "ref_text": "很高兴你的精神状态还算正常，没有受到那片原始梦境的影响。运气不错。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/黑天鹅/黑天鹅-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/黑天鹅/黑天鹅_e16_s5792.pth",
+        "role": "女配"
+    },
+    "黄泉": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/黄泉/多么有趣啊，方才那一瞬间仿佛有千百万个相似而不相同的你。给出了截然不同的回答。.wav",
+        "ref_text": "多么有趣啊，方才那一瞬间仿佛有千百万个相似而不相同的你。给出了截然不同的回答。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/黄泉/黄泉-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/黄泉/黄泉_e16_s5344.pth",
+        "role": "女配"
+    },
+    "姬子": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/姬子/我们去和科员们聊聊吧，这种时候大家都不希望空间站的内部再出现意外。你试过联系黑塔了吗？.wav",
+        "ref_text": "我们去和科员们聊聊吧，这种时候大家都不希望空间站的内部再出现意外。你试过联系黑塔了吗？",
+        "gpt_model": "/root/code/GPT-SoVITS/model/姬子/姬子-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/姬子/姬子_e16_s7488.pth",
+        "role": "女配"
+    },
+    "流萤": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/流萤/因为我正在一辆疲劳驾驶的车上，我希望他能安全抵达。.wav",
+        "ref_text": "因为我正在一辆疲劳驾驶的车上，我希望他能安全抵达。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/流萤/流萤-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/流萤/流萤_e16_s5744.pth",
+        "role": "女配"
+    },
+    "莫娜": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/莫娜/我出生在蒙德父母移居金福港了。有段时间，我跟着老太婆四处游学。回来就在蒙多城里安了家。.wav",
+        "ref_text": "我出生在蒙德父母移居金福港了。有段时间，我跟着老太婆四处游学。回来就在蒙多城里安了家。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/莫娜/莫娜-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/莫娜/莫娜_e16_s7008.pth",
+        "role": "女配"
+    },
+    "娜维娅": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/娜维娅/长官，我们之前是在城里打听魔物的去向，我们的目的正是为了帮助这个城市。还有在城市中努力生活的人们。.wav",
+        "ref_text": "长官，我们之前是在城里打听魔物的去向，我们的目的正是为了帮助这个城市。还有在城市中努力生活的人们。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/娜维娅/娜维娅-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/娜维娅/娜维娅_e16_s10896.pth",
+        "role": "女配"
+    },
+    "三月七": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/三月七/这里到处都是稀奇的玩意儿，也就是所谓的奇物。哎，黑塔收集这些东西，又不用净，隔着石灰。也不知道图啥。.wav",
+        "ref_text": "这里到处都是稀奇的玩意儿，也就是所谓的奇物。哎，黑塔收集这些东西，又不用净，隔着石灰。也不知道图啥。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/三月七/三月七-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/三月七/三月七_e16_s24224.pth",
+        "role": "女配"
+    },
+    "珊瑚宫心海": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/珊瑚宫心海/毕竟听你们描述，他只有过一次偷盗行为，还被人看到了。在之后就都是用交易和打赌的方式获得排位。.wav",
+        "ref_text": "毕竟听你们描述，他只有过一次偷盗行为，还被人看到了。在之后就都是用交易和打赌的方式获得排位。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/珊瑚宫心海/珊瑚宫心海-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/珊瑚宫心海/珊瑚宫心海_e16_s5792.pth",
+        "role": "女配"
+    },
+    "温迪": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/温迪/我也很好奇，大家会写出什么作品来，恭喜你凯亚。你的意见被采纳了。.wav",
+        "ref_text": "我也很好奇，大家会写出什么作品来，恭喜你凯亚。你的意见被采纳了。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/温迪/温迪-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/温迪/温迪_e16_s8784.pth",
+        "role": "女配"
+    },
+    "荧": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/荧/从杜吉耶的态度上看，他早就知道我们无法找到证据。.wav",
+        "ref_text": "从杜吉耶的态度上看，他早就知道我们无法找到证据。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/荧/荧-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/荧/荧_e16_s2272.pth",
+        "role": "女配"
+    },
+    "艾尔海森": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/艾尔海森/这应该是汉代的赝品，怎么说呢，你说它是假的，也不是假的，.wav",
+        "ref_text": "这应该是汉代的赝品，怎么说呢，你说它是假的，也不是假的，",
+        "gpt_model": "/root/code/GPT-SoVITS/model/艾尔海森/艾尔海森-e40.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/艾尔海森/艾尔海森_e24_s31152.pth",
+        "role": "男配"
+    },
+    "丹恒": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/丹恒/我出身于联盟生在一艘奇力雄伟的巨舰之上，其模样我却很少见到现在回不去了。.wav",
+        "ref_text": "我出身于联盟生在一艘奇力雄伟的巨舰之上，其模样我却很少见到现在回不去了。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/丹恒/丹恒-e35.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/丹恒/丹恒_e16_s5520.pth",
+        "role": "男配"
+    },
+    "枫原万叶": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/枫原万叶/就连风中一直吵闹的杂音也在那演息了。此等神艺我猜测，那就是璃月传说中的仙家宝地吧。.wav",
+        "ref_text": "就连风中一直吵闹的杂音也在那演息了。此等神艺我猜测，那就是璃月传说中的仙家宝地吧。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/枫原万叶/枫原万叶-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/枫原万叶/枫原万叶_e16_s5840.pth",
+        "role": "男配"
+    },
+    "杰帕德": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/杰帕德/也不排除这个可能不若尼亚大人擅读人心，他应该知道要是没有足够强烈的理由，你是绝对不会踏进克里波堡半步的。.wav",
+        "ref_text": "也不排除这个可能不若尼亚大人擅读人心，他应该知道要是没有足够强烈的理由，你是绝对不会踏进克里波堡半步的。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/杰帕德/杰帕德-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/杰帕德/杰帕德_e16_s2464.pth",
+        "role": "男配"
+    },
+    "卡维": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/卡维/就算不说是灵魂，至少也是建筑风格的集中体现吧，稍微有常识的人都能看出来，这里压根儿就没有修改的可能。.wav",
+        "ref_text": "就算不说是灵魂，至少也是建筑风格的集中体现吧，稍微有常识的人都能看出来，这里压根儿就没有修改的可能。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/卡维/卡维-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/卡维/卡维_e16_s5456.pth",
+        "role": "男配"
+    },
+    "凯亚": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/凯亚/这里演到了王子征战胜利，并决定缔结和平条约之后，王子写信提议国王接受和平国王好像想清楚了，我们接着看。.wav",
+        "ref_text": "这里演到了王子征战胜利，并决定缔结和平条约之后，王子写信提议国王接受和平国王好像想清楚了，我们接着看。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/凯亚/凯亚-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/凯亚/凯亚_e16_s6896.pth",
+        "role": "男配"
+    },
+    "空": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/空/林尼并没有参与到地道的混乱中，他只是在回来的时候，目击了现场留下的痕迹。.wav",
+        "ref_text": "林尼并没有参与到地道的混乱中，他只是在回来的时候，目击了现场留下的痕迹。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/空/空-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/空/空_e16_s1648.pth",
+        "role": "男配"
+    },
+    "莱欧斯利": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/莱欧斯利/或许只是你一个不经意的举动，就催生出了新的变化，扭转了既定的命运。.wav",
+        "ref_text": "或许只是你一个不经意的举动，就催生出了新的变化，扭转了既定的命运。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/莱欧斯利/莱欧斯利-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/莱欧斯利/莱欧斯利_e16_s4048.pth",
+        "role": "男配"
+    },
+    "赛诺": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/赛诺/总之我们在做的事很危险，我已经习惯了，但我不想看到你们受伤。.wav",
+        "ref_text": "总之我们在做的事很危险，我已经习惯了，但我不想看到你们受伤。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/赛诺/赛诺-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/赛诺/赛诺_e16_s5632.pth",
+        "role": "男配"
+    },
+    "桑博": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/桑博/哎，要不一起搭个伙呗，我有可靠消息，银宗铁威的主力都被调去前线了，这可是千载难逢的好机会。.wav",
+        "ref_text": "哎，要不一起搭个伙呗，我有可靠消息，银宗铁威的主力都被调去前线了，这可是千载难逢的好机会。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/桑博/桑博-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/桑博/桑博_e16_s2368.pth",
+        "role": "男配"
+    },
+    "砂金": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/砂金/那就拭目以待吧，等见到那位控制欲溢出的橡目家主，我自有办法从他嘴里撬出答案。.wav",
+        "ref_text": "那就拭目以待吧，等见到那位控制欲溢出的橡目家主，我自有办法从他嘴里撬出答案。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/砂金/砂金-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/砂金/砂金_e16_s3680.pth",
+        "role": "男配"
+    },
+    "托马": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/托马/要知道地头蛇这种身份可是伪装不了的。我可是真正花了将近一个月的时间，把整座岛上的人都混熟了，又结交了北斗大姐头。.wav",
+        "ref_text": "要知道地头蛇这种身份可是伪装不了的。我可是真正花了将近一个月的时间，把整座岛上的人都混熟了，又结交了北斗大姐头。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/托马/托马-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/托马/托马_e16_s4848.pth",
+        "role": "男配"
+    },
+    "瓦尔特": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/瓦尔特/但是只要星河还在你身体里，就要小心行事，我和妻子没有把握，每次都能恰好压制住他。.wav",
+        "ref_text": "但是只要星河还在你身体里，就要小心行事，我和妻子没有把握，每次都能恰好压制住他。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/瓦尔特/瓦尔特-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/瓦尔特/瓦尔特_e16_s5280.pth",
+        "role": "男配"
+    },
+    "星期日": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/星期日/打开它吧，沙金先生，这是你维护自己名誉的最后机会。.wav",
+        "ref_text": "打开它吧，沙金先生，这是你维护自己名誉的最后机会。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/星期日/星期日-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/星期日/星期日_e16_s2384.pth",
+        "role": "男配"
+    },
+    "真理医生": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/真理医生/那你应该也明白，一位合格的学者能认清自己的位置，不会为无聊的尊严丢失更重要的东西。.wav",
+        "ref_text": "那你应该也明白，一位合格的学者能认清自己的位置，不会为无聊的尊严丢失更重要的东西。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/真理医生/真理医生-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/真理医生/真理医生_e16_s1712.pth",
+        "role": "男配"
+    },
+    "钟离": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/钟离/既然听了别人，许多观点，不妨也将其融入故事，有理有据，更能服人。.wav",
+        "ref_text": "既然听了别人，许多观点，不妨也将其融入故事，有理有据，更能服人。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/钟离/钟离-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/钟离/钟离_e16_s6096.pth",
+        "role": "男配"
+    },
+    "旁白1": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/旁白1/那目光中似乎有一点点好奇，仿佛是在好奇，为什么一个渺小的凡人船长竟敢跟自己讨价还价？.wav",
+        "ref_text": "那目光中似乎有一点点好奇，仿佛是在好奇，为什么一个渺小的凡人船长竟敢跟自己讨价还价？",
+        "gpt_model": "/root/code/GPT-SoVITS/model/旁白1/旁白1-e15.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/旁白1/旁白1_e8_s10912.pth",
+        "role": "旁白"
+    },
+    "银枝": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/银枝/但倘若你所言，确实非虚唇美，在上，我们就借这场命中注定的对决，检验你的能力吧。.wav",
+        "ref_text": "但倘若你所言，确实非虚唇美，在上，我们就借这场命中注定的对决，检验你的能力吧。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/银枝/银枝-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/银枝/银枝_e16_s1856.pth",
+        "role": "忽略"
+    },
+    "斯科特": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/斯科特/你当然可以把仙舟的本事吹上天，说到底你不过是他们请来的说客罢了。.wav",
+        "ref_text": "你当然可以把仙舟的本事吹上天，说到底你不过是他们请来的说客罢了。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/斯科特/斯科特-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/斯科特/斯科特_e16_s1712.pth",
+        "role": "忽略"
+    },
+    "那维莱特": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/那维莱特/回味比之前遇到风丹的那些要更纯粹。由此可见，长途运输也会让水在一路上掺杂其他的思绪。.wav",
+        "ref_text": "回味比之前遇到风丹的那些要更纯粹。由此可见，长途运输也会让水在一路上掺杂其他的思绪。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/那维莱特/那维莱特-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/那维莱特/那维莱特_e16_s5504.pth",
+        "role": "忽略"
+    },
+    "荒泷一斗": {
+        "ref_audio_path": "/root/code/GPT-SoVITS/model/荒泷一斗/你们先去准备传单，拉拢足够的观众，本大爷就在这里，稍微指点一下挚友和飞行员警官。带他们上手。.wav",
+        "ref_text": "你们先去准备传单，拉拢足够的观众，本大爷就在这里，稍微指点一下挚友和飞行员警官。带他们上手。",
+        "gpt_model": "/root/code/GPT-SoVITS/model/荒泷一斗/荒泷一斗-e30.ckpt",
+        "sovits_model": "/root/code/GPT-SoVITS/model/荒泷一斗/荒泷一斗_e16_s9648.pth",
+        "role": "忽略"
+    }
+}
