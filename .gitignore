@@ -198,3 +198,4 @@ model/
 test_gen/
 tmp/
 tooks/
+auto_task.py
