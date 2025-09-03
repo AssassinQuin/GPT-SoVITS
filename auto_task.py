@@ -37,8 +37,8 @@ class AudioProcessor:
 
         self.task_list = self.load_task_list()
         self.current_task = None
-        self.max_retry_count = 3  # 最大重试次数
-        self.similarity_threshold = 0.8  # 声母相似度阈值
+        self.max_retry_count = 5  # 最大重试次数
+        self.similarity_threshold = 0.92  # 声母相似度阈值
 
     def load_task_list(self) -> List[Dict[str, Any]]:
         """
@@ -203,9 +203,10 @@ class AudioProcessor:
         Returns:
             str: 去除标点符号后的文本。
         """
-        # 定义中英文标点符号
-        punctuation = r'[\s+\.\!\/\_,$%^*(+\"\']+|[+——！，。？、~@#￥%……&*（）]+'
-        return re.sub(punctuation, '', text)
+        # 保留中英文、数字、日文，去除其他字符
+        # 中文：\u4e00-\u9fff，英文：a-zA-Z，数字：0-9，日文：\u3040-\u309f\u30a0-\u30ff
+        pattern = r'[^\u4e00-\u9fffa-zA-Z0-9\u3040-\u309f\u30a0-\u30ff]'
+        return re.sub(pattern, '', text)
     
     def get_initials(self, text: str) -> List[str]:
         """
@@ -257,9 +258,13 @@ class AudioProcessor:
             str: 识别出的文本。
         """
         try:
-            # 创建临时文件保存音频
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
-                temp_path = temp_file.name
+            # 确保目录存在
+            os.makedirs("tmp/tmp_gen", exist_ok=True)
+            
+            # 生成唯一的文件名
+            import uuid
+            temp_filename = f"audio_{uuid.uuid4().hex[:8]}.wav"
+            temp_path = os.path.join("tmp/tmp_gen", temp_filename)
                 
             # 保存音频到临时文件
             if audio_tensor.dim() == 1:
@@ -292,7 +297,7 @@ class AudioProcessor:
             bool: 音频质量是否合格。
         """
         # ASR识别生成的音频
-        recognized_text = self.audio_to_text(audio_tensor, sample_rate, language)
+        recognized_text = self.audio_to_text(audio_tensor, sample_rate, 'zh')
         
         if not recognized_text:
             logger.warning("ASR识别失败，跳过质量检测")
@@ -306,10 +311,13 @@ class AudioProcessor:
         logger.info(f"识别文本(去标点): {recognized_clean}")
         
         # 检查长度：识别文本不应该明显长于原始文本
-        if len(recognized_clean) > len(original_clean) * 1.2:  # 允许20%的长度差异
-            logger.warning(f"识别文本过长: {len(recognized_clean)} > {len(original_clean) * 1.2}")
+        if len(recognized_clean) > len(original_clean) * 1.1:  # 允许20%的长度差异
+            logger.warning(f"识别文本过长: {len(recognized_clean)} > {len(original_clean) * 1.1}")
             return False
         
+        if recognized_clean== original_clean:
+            return True
+
         # 计算声母相似度
         similarity = self.calculate_initial_similarity(original_clean, recognized_clean)
         logger.info(f"声母相似度: {similarity:.3f}")
@@ -400,8 +408,9 @@ class AudioProcessor:
             # 清理相似度映射
             self.pinyin_similarity_map.clear()
 
-            # 保存音频和文本
-            self.save_audio(speaker, prepared_audio, original_text)
+            if try_count <= 1:
+                # 保存音频和文本
+                self.save_audio(speaker, prepared_audio, original_text)
 
             audio_fragments.append(prepared_audio)
 
