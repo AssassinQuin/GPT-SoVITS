@@ -291,6 +291,9 @@ class AudioProcessor:
         Returns:
             bool: 音频质量是否合格。
         """
+
+        if language != "中文":
+            return True
         # ASR识别生成的音频
         recognized_text = self.audio_to_text(audio_tensor, sample_rate, "zh")
 
@@ -413,7 +416,7 @@ class AudioProcessor:
             # 清理相似度映射
             self.pinyin_similarity_map.clear()
 
-            if try_count <= 1:
+            if try_count <= 1 and lang == "中文":
                 # 保存音频和文本
                 self.save_audio(speaker, prepared_audio, original_text)
 
