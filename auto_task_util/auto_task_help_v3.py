@@ -436,7 +436,7 @@ def classify_text(text: str) -> str:
     return "中文"
 
 
-def get_texts(text):
+def get_texts(text, ignore_punctuation: bool = False):
     normalizer = TextNormalizer()
 
     section_texts = []

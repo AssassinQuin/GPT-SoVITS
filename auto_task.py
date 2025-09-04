@@ -534,8 +534,7 @@ class AudioProcessor:
 
             # 获取所有文本行
             texts = (
-                # get_texts(file_content, ignore_punctuation=True)
-                get_texts(file_content)
+                get_texts(file_content, ignore_punctuation=True)
                 if not bookname_to_role
                 else get_texts(file_content)
             )
