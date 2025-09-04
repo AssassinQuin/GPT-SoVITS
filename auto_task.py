@@ -138,7 +138,7 @@ class AudioProcessor:
 
         # 检查并跳过处理过多文件的说话人
         existing_wav_files = [f for f in os.listdir(speaker_dir) if f.endswith(".wav")]
-        if len(existing_wav_files) > 5000:
+        if len(existing_wav_files) > 30000:
             self.skipped_speakers.append(spk)
             return
 

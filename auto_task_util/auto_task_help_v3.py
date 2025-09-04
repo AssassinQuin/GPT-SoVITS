@@ -26,7 +26,7 @@ def format_text(text):
     # 2. 清除所有特殊字符
     text = clean_text(text)
     # 3. 合并过短行：若一行字符串数据长度小于 10，则与上一行或下一行中"数据长度更小"的一行合并
-    text = merge_short_lines(text, min_len=20)
+    text = merge_short_lines(text, min_len=10)
     return text
 
 
@@ -453,7 +453,7 @@ def get_texts(text):
     return section_texts
 
 
-def remove_punctuation(self, text: str) -> str:
+def remove_punctuation(text: str, ignore_punctuation: bool) -> str:
     """
     去除文本中的标点符号。
 
