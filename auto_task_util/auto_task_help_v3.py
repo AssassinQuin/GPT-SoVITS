@@ -453,7 +453,7 @@ def get_texts(text, ignore_punctuation: bool = False):
     return section_texts
 
 
-def remove_punctuation(text: str, ignore_punctuation: bool) -> str:
+def remove_punctuation(text: str, ignore_punctuation: bool = False) -> str:
     """
     去除文本中的标点符号。
 
