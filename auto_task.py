@@ -1,22 +1,24 @@
-﻿import json
+﻿import difflib
+import json
 import os
 import re
+import tempfile
 import time
 from typing import Any, Dict, List
-import tempfile
-import difflib
 
 import numpy as np
 import pyloudnorm as pyln
 import torch
 import torchaudio
 from loguru import logger
+from pypinyin import Style, lazy_pinyin
 from torchaudio import transforms
 from tqdm import tqdm
-from pypinyin import lazy_pinyin, Style
 
 from api_v3 import GPTSoVITSWrapper
-from auto_task_util.auto_task_help_v2 import clear_text, get_texts
+
+# from auto_task_util.auto_task_help_v2 import clear_text
+from auto_task_util.auto_task_help_v3 import format_text, get_texts, remove_punctuation
 from tools.asr.funasr_asr import only_asr
 
 
@@ -145,7 +147,7 @@ class AudioProcessor:
 
         # 计算音频时长
         audio_duration = len(audio_tensor.squeeze()) / self.target_sample_rate
-        
+
         # 只保存时长在3秒到15秒之间的音频
         if audio_duration < 3.0 or audio_duration > 15.0:
             return
@@ -193,139 +195,136 @@ class AudioProcessor:
                 return json.load(f)
         return default
 
-    def remove_punctuation(self, text: str) -> str:
-        """
-        去除文本中的标点符号。
-        
-        Args:
-            text (str): 原始文本。
-            
-        Returns:
-            str: 去除标点符号后的文本。
-        """
-        # 保留中英文、数字、日文，去除其他字符
-        # 中文：\u4e00-\u9fff，英文：a-zA-Z，数字：0-9，日文：\u3040-\u309f\u30a0-\u30ff
-        pattern = r'[^\u4e00-\u9fffa-zA-Z0-9\u3040-\u309f\u30a0-\u30ff]'
-        return re.sub(pattern, '', text)
-    
     def get_initials(self, text: str) -> List[str]:
         """
         提取文本的声母。
-        
+
         Args:
             text (str): 输入文本。
-            
+
         Returns:
             List[str]: 声母列表。
         """
         # 获取拼音的声母
         pinyins = lazy_pinyin(text, style=Style.INITIALS, strict=False)
         return [p for p in pinyins if p]  # 过滤空字符串
-    
+
     def calculate_initial_similarity(self, text1: str, text2: str) -> float:
         """
         计算两个文本的声母相似度。
-        
+
         Args:
             text1 (str): 第一个文本。
             text2 (str): 第二个文本。
-            
+
         Returns:
             float: 相似度分数 (0-1)。
         """
         initials1 = self.get_initials(text1)
         initials2 = self.get_initials(text2)
-        
+
         if not initials1 and not initials2:
             return 1.0
         if not initials1 or not initials2:
             return 0.0
-            
+
         # 使用序列匹配器计算相似度
         matcher = difflib.SequenceMatcher(None, initials1, initials2)
         return matcher.ratio()
-    
-    def audio_to_text(self, audio_tensor: torch.Tensor, sample_rate: int, language: str = "zh") -> str:
+
+    def audio_to_text(
+        self, audio_tensor: torch.Tensor, sample_rate: int, language: str = "zh"
+    ) -> str:
         """
         将音频转换为文本。
-        
+
         Args:
             audio_tensor (torch.Tensor): 音频张量。
             sample_rate (int): 采样率。
             language (str): 语言代码。
-            
+
         Returns:
             str: 识别出的文本。
         """
         try:
             # 确保目录存在
             os.makedirs("tmp/tmp_gen", exist_ok=True)
-            
+
             # 生成唯一的文件名
             import uuid
+
             temp_filename = f"audio_{uuid.uuid4().hex[:8]}.wav"
             temp_path = os.path.join("tmp/tmp_gen", temp_filename)
-                
+
             # 保存音频到临时文件
             if audio_tensor.dim() == 1:
                 audio_tensor = audio_tensor.unsqueeze(0)
             torchaudio.save(temp_path, audio_tensor, sample_rate)
-            
+
             # 使用ASR识别
             recognized_text = only_asr(temp_path, language)
-            
+
             # 清理临时文件
             os.unlink(temp_path)
-            
+
             return recognized_text.strip()
         except Exception as e:
             logger.error(f"ASR识别失败: {e}")
             return ""
-    
-    def validate_audio_quality(self, original_text: str, audio_tensor: torch.Tensor, 
-                             sample_rate: int, language: str = "zh") -> bool:
+
+    def validate_audio_quality(
+        self,
+        original_text: str,
+        audio_tensor: torch.Tensor,
+        sample_rate: int,
+        language: str = "zh",
+    ) -> bool:
         """
         验证生成音频的质量。
-        
+
         Args:
             original_text (str): 原始输入文本。
             audio_tensor (torch.Tensor): 生成的音频张量。
             sample_rate (int): 采样率。
             language (str): 语言代码。
-            
+
         Returns:
             bool: 音频质量是否合格。
         """
         # ASR识别生成的音频
-        recognized_text = self.audio_to_text(audio_tensor, sample_rate, 'zh')
-        
+        recognized_text = self.audio_to_text(audio_tensor, sample_rate, "zh")
+
         if not recognized_text:
             logger.warning("ASR识别失败，跳过质量检测")
             return True  # 如果ASR失败，默认通过
-        
+
         # 去除标点符号
         original_clean = self.remove_punctuation(original_text)
         recognized_clean = self.remove_punctuation(recognized_text)
-        
+
         logger.info(f"原始文本(去标点): {original_clean}")
         logger.info(f"识别文本(去标点): {recognized_clean}")
-        
+
         # 检查长度：识别文本不应该明显长于原始文本
         if len(recognized_clean) > len(original_clean) * 1.1:  # 允许20%的长度差异
-            logger.warning(f"识别文本过长: {len(recognized_clean)} > {len(original_clean) * 1.1}")
+            logger.warning(
+                f"识别文本过长: {len(recognized_clean)} > {len(original_clean) * 1.1}"
+            )
             return False
-        
-        if recognized_clean== original_clean:
+
+        if recognized_clean == original_clean:
             return True
 
         # 计算声母相似度
         similarity = self.calculate_initial_similarity(original_clean, recognized_clean)
         logger.info(f"声母相似度: {similarity:.3f}")
-        
+
         if similarity < self.similarity_threshold:
-            logger.warning(f"声母相似度过低: {similarity:.3f} < {self.similarity_threshold}")
+            logger.warning(
+                f"声母相似度过低: {similarity:.3f} < {self.similarity_threshold}"
+            )
             return False
-        
+
         return True
 
     def process_text_line(
@@ -353,7 +352,7 @@ class AudioProcessor:
         for text_info in parsed_texts:
             (text, lang) = text_info
             original_text = text
-            cleaned_text = clear_text(text, ignore_punctuation=True)
+            cleaned_text = remove_punctuation(text, ignore_punctuation=True)
 
             if not cleaned_text:
                 continue
@@ -365,11 +364,11 @@ class AudioProcessor:
             try_count = 0
             quality_passed = False
             prepared_audio = None
-            
+
             while try_count < self.max_retry_count and not quality_passed:
                 try_count += 1
                 logger.info(f"第 {try_count} 次尝试生成音频: {original_text[:20]}...")
-                
+
                 # 调用 TTS 推理函数
                 returned_sr, generated_audio = self.model.inference_with_spk(
                     speaker, original_text, lang
@@ -386,25 +385,31 @@ class AudioProcessor:
                 # 将生成的音频转换为 NumPy 数组
                 generated_audio_np = generated_audio.squeeze().cpu().numpy()
                 generated_tensor = torch.from_numpy(generated_audio_np).unsqueeze(0)
-                
+
                 # 音频质量检测
-                if self.validate_audio_quality(original_text, generated_tensor, self.target_sample_rate, lang):
+                if self.validate_audio_quality(
+                    original_text, generated_tensor, self.target_sample_rate, lang
+                ):
                     quality_passed = True
-                    prepared_audio = self.prepare_audio(generated_tensor, self.target_sample_rate)
+                    prepared_audio = self.prepare_audio(
+                        generated_tensor, self.target_sample_rate
+                    )
                     logger.info(f"音频质量检测通过，第 {try_count} 次尝试成功")
                 else:
                     logger.warning(f"音频质量检测未通过，第 {try_count} 次尝试失败")
                     if try_count < self.max_retry_count:
                         logger.info("准备重新生成音频...")
-            
+
             # 如果所有尝试都失败，使用最后一次生成的音频
             if not quality_passed:
-                logger.warning(f"经过 {self.max_retry_count} 次尝试，音频质量仍未达标，使用最后生成的音频")
+                logger.warning(
+                    f"经过 {self.max_retry_count} 次尝试，音频质量仍未达标，使用最后生成的音频"
+                )
                 if prepared_audio is None:
                     # 如果没有成功生成任何音频，跳过这个文本片段
                     logger.error(f"无法生成音频，跳过文本: {original_text}")
                     continue
-            
+
             # 清理相似度映射
             self.pinyin_similarity_map.clear()
 
@@ -520,14 +525,17 @@ class AudioProcessor:
 
             for item in chapter_map_list:
                 sanitized_item = {
-                    clear_text(key, ignore_punctuation=True): value
+                    remove_punctuation(key, ignore_punctuation=True): value
                     for key, value in item.items()
                 }
                 chapter_map.update(sanitized_item)
 
+            file_content = format_text(file_content)
+
             # 获取所有文本行
             texts = (
-                get_texts(file_content, ignore_punctuation=True)
+                # get_texts(file_content, ignore_punctuation=True)
+                get_texts(file_content)
                 if not bookname_to_role
                 else get_texts(file_content)
             )
@@ -549,7 +557,7 @@ class AudioProcessor:
             ) as progress_bar:
                 for idx, line_info in enumerate(progress_bar, start=1):
                     (line, _) = line_info
-                    cleaned_line = clear_text(line, ignore_punctuation=True)
+                    cleaned_line = remove_punctuation(line, ignore_punctuation=True)
 
                     # 获取角色对应的说话人
                     book_role = chapter_map.get(cleaned_line, {}).get("role", "")
