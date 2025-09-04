@@ -299,8 +299,8 @@ class AudioProcessor:
             return True  # 如果ASR失败，默认通过
 
         # 去除标点符号
-        original_clean = self.remove_punctuation(original_text)
-        recognized_clean = self.remove_punctuation(recognized_text)
+        original_clean = remove_punctuation(original_text, ignore_punctuation=True)
+        recognized_clean = remove_punctuation(recognized_text, ignore_punctuation=True)
 
         logger.info(f"原始文本(去标点): {original_clean}")
         logger.info(f"识别文本(去标点): {recognized_clean}")
